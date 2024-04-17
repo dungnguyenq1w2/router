@@ -1,6 +1,6 @@
 {
   "name": "@tanstack/router-cli",
-  "version": "1.23.0",
+  "version": "1.28.2",
   "description": "",
   "author": "Tanner Linsley",
   "license": "MIT",
@@ -64,6 +64,7 @@
     "yargs": "^17.6.2"
   },
   "devDependencies": {
-    "@types/yargs": "^17.0.15"
+    "@types/yargs": "^17.0.15",
+    "vite": "^5.0.13"
   }
 }

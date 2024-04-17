@@ -1,6 +1,6 @@
 {
   "name": "@tanstack/react-router",
-  "version": "1.26.1",
+  "version": "1.28.4",
   "description": "",
   "author": "Tanner Linsley",
   "license": "MIT",
@@ -36,8 +36,8 @@
     "clean": "rimraf ./dist && rimraf ./coverage",
     "test:eslint": "eslint --ext .ts,.tsx ./src",
     "test:types": "tsc --noEmit",
-    "test:lib": "vitest --typecheck",
-    "test:lib:dev": "pnpm run test:lib --watch",
+    "test:unit": "vitest --typecheck",
+    "test:unit:dev": "pnpm run test:unit --watch",
     "test:build": "publint --strict",
     "build": "vite build"
   },
@@ -60,11 +60,13 @@
   "dependencies": {
     "@tanstack/history": "workspace:*",
     "@tanstack/react-store": "^0.2.1",
+    "@testing-library/react": "^15.0.2",
     "tiny-invariant": "^1.3.1",
     "tiny-warning": "^1.0.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
+    "jsdom": "^24.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "zod": "^3.22.4"

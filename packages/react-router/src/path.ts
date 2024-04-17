@@ -28,12 +28,53 @@ export function trimPath(path: string) {
   return trimPathRight(trimPathLeft(path))
 }
 
-export function resolvePath(basepath: string, base: string, to: string) {
+// When resolving relative paths, we treat all paths as if they are trailing slash
+// documents. All trailing slashes are removed after the path is resolved.
+// Here are a few examples:
+//
+// /a/b/c + ./d = /a/b/c/d
+// /a/b/c + ../d = /a/b/d
+// /a/b/c + ./d/ = /a/b/c/d
+// /a/b/c + ../d/ = /a/b/d
+// /a/b/c + ./ = /a/b/c
+//
+// Absolute paths that start with `/` short circuit the resolution process to the root
+// path.
+//
+// Here are some examples:
+//
+// /a/b/c + /d = /d
+// /a/b/c + /d/ = /d
+// /a/b/c + / = /
+//
+// Non-.-prefixed paths are still treated as relative paths, resolved like `./`
+//
+// Here are some examples:
+//
+// /a/b/c + d = /a/b/c/d
+// /a/b/c + d/ = /a/b/c/d
+// /a/b/c + d/e = /a/b/c/d/e
+interface ResolvePathOptions {
+  basepath: string
+  base: string
+  to: string
+  trailingSlash?: 'always' | 'never' | 'preserve'
+}
+export function resolvePath({
+  basepath,
+  base,
+  to,
+  trailingSlash = 'never',
+}: ResolvePathOptions) {
   base = base.replace(new RegExp(`^${basepath}`), '/')
   to = to.replace(new RegExp(`^${basepath}`), '/')
 
   let baseSegments = parsePathname(base)
   const toSegments = parsePathname(to)
+
+  if (baseSegments.length > 1 && last(baseSegments)?.value === '/') {
+    baseSegments.pop()
+  }
 
   toSegments.forEach((toSegment, index) => {
     if (toSegment.value === '/') {
@@ -47,20 +88,25 @@ export function resolvePath(basepath: string, base: string, to: string) {
         // ignore inter-slashes
       }
     } else if (toSegment.value === '..') {
-      // Extra trailing slash? pop it off
-      if (baseSegments.length > 1 && last(baseSegments)?.value === '/') {
-        baseSegments.pop()
-      }
       baseSegments.pop()
     } else if (toSegment.value === '.') {
-      return
+      // ignore
     } else {
       baseSegments.push(toSegment)
     }
   })
 
-  const joined = joinPaths([basepath, ...baseSegments.map((d) => d.value)])
+  if (baseSegments.length > 1) {
+    if (last(baseSegments)?.value === '/') {
+      if (trailingSlash === 'never') {
+        baseSegments.pop()
+      }
+    } else if (trailingSlash === 'always') {
+      baseSegments.push({ type: 'pathname', value: '/' })
+    }
+  }
 
+  const joined = joinPaths([basepath, ...baseSegments.map((d) => d.value)])
   return cleanPath(joined)
 }
 

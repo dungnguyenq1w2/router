@@ -1,6 +1,6 @@
 {
   "name": "@tanstack/router-vite-plugin",
-  "version": "1.25.0",
+  "version": "1.28.2",
   "description": "",
   "author": "Tanner Linsley",
   "license": "MIT",
@@ -35,7 +35,7 @@
   "scripts": {
     "clean": "rimraf ./dist && rimraf ./coverage",
     "test": "pnpm test:eslint && pnpm test:types && pnpm test:build && pnpm test:unit",
-    "test:unit": "vitest",
+    "test:unit": "vitest --typecheck --watch=false",
     "test:eslint": "eslint --ext .ts,.tsx ./src",
     "test:types": "tsc --noEmit",
     "test:build": "publint --strict",

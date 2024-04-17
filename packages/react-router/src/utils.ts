@@ -15,12 +15,14 @@ export type PickRequired<T> = {
 }
 
 // from https://stackoverflow.com/a/76458160
-export type WithoutEmpty<T> = T extends T ? ({} extends T ? never : T) : never
+export type WithoutEmpty<T> = T extends any ? ({} extends T ? never : T) : never
 
 // export type Expand<T> = T
 export type Expand<T> = T extends object
   ? T extends infer O
-    ? { [K in keyof O]: O[K] }
+    ? O extends Function
+      ? O
+      : { [K in keyof O]: O[K] }
     : never
   : T
 
@@ -36,10 +38,12 @@ export type DeepPartial<T> = T extends object
     }
   : T
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
-export type MakeDifferenceOptional<T, U> = Omit<U, keyof T> &
-  Partial<Pick<U, keyof T & keyof U>> &
-  PickRequired<Omit<U, keyof PickRequired<T>>>
+export type MakeDifferenceOptional<TLeft, TRight> = Omit<
+  TRight,
+  keyof TLeft
+> & {
+  [K in keyof TLeft & keyof TRight]?: TRight[K]
+}
 
 // from https://stackoverflow.com/a/53955431
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -49,68 +53,11 @@ export type IsUnion<T, U extends T = T> = (
   ? false
   : true
 
-// type Compute<T> = { [K in keyof T]: T[K] } | never
-
-// type AllKeys<T> = T extends any ? keyof T : never
-
-// export type MergeUnion<T, Keys extends keyof T = keyof T> = Compute<
-//   {
-//     [K in Keys]: T[Keys]
-//   } & {
-//     [K in AllKeys<T>]?: T extends any
-//       ? K extends keyof T
-//         ? T[K]
-//         : never
-//       : never
-//   }
-// >
-
-export type Assign<TLeft, TRight> = Omit<TLeft, keyof TRight> & TRight
-
-export type AssignAll<T extends Array<any>> = T extends [
-  infer Left,
-  ...infer Right,
-]
-  ? Right extends Array<any>
-    ? Assign<Left, AssignAll<Right>>
-    : Left
-  : {}
-
-// // Sample types to merge
-// type TypeA = {
-//   shared: string
-//   onlyInA: string
-//   nested: {
-//     shared: string
-//     aProp: string
-//   }
-//   array: string[]
-// }
-
-// type TypeB = {
-//   shared: number
-//   onlyInB: number
-//   nested: {
-//     shared: number
-//     bProp: number
-//   }
-//   array: number[]
-// }
-
-// type TypeC = {
-//   shared: boolean
-//   onlyInC: boolean
-//   nested: {
-//     shared: boolean
-//     cProp: boolean
-//   }
-//   array: boolean[]
-// }
-
-// type Test = Expand<Assign<TypeA, TypeB>>
-
-// // Using DeepMerge to merge TypeA and TypeB
-// type MergedType = Expand<AssignAll<[TypeA, TypeB, TypeC]>>
+export type Assign<TLeft, TRight> = keyof TLeft extends never
+  ? TRight
+  : keyof TRight extends never
+    ? TLeft
+    : Omit<TLeft, keyof TRight> & TRight
 
 export type Timeout = ReturnType<typeof setTimeout>
 
@@ -134,8 +81,6 @@ export type UnionToTuple<T, TLast = LastInUnion<T>> = [T] extends [never]
   : [...UnionToTuple<Exclude<T, TLast>>, TLast]
 
 //
-
-export const isServer = typeof document === 'undefined'
 
 export function last<T>(arr: Array<T>) {
   return arr[arr.length - 1]
@@ -362,4 +307,35 @@ export function removeTrailingSlash(value: string): string {
 // /sample/path1/some <> /sample/path1
 export function exactPathTest(pathName1: string, pathName2: string): boolean {
   return removeTrailingSlash(pathName1) === removeTrailingSlash(pathName2)
+}
+
+export type ControlledPromise<T> = Promise<T> & {
+  resolve: (value: T) => void
+  reject: (value: any) => void
+  status: 'pending' | 'resolved' | 'rejected'
+}
+
+export function createControlledPromise<T>(onResolve?: () => void) {
+  let resolveLoadPromise!: () => void
+  let rejectLoadPromise!: (value: any) => void
+
+  const controlledPromise = new Promise<void>((resolve, reject) => {
+    resolveLoadPromise = resolve
+    rejectLoadPromise = reject
+  }) as ControlledPromise<T>
+
+  controlledPromise.status = 'pending'
+
+  controlledPromise.resolve = () => {
+    controlledPromise.status = 'resolved'
+    resolveLoadPromise()
+    onResolve?.()
+  }
+
+  controlledPromise.reject = (e) => {
+    controlledPromise.status = 'rejected'
+    rejectLoadPromise(e)
+  }
+
+  return controlledPromise
 }

@@ -85,7 +85,7 @@ export async function compileFile(opts: {
             visitor: {
               Program: {
                 enter(programPath: babel.NodePath<t.Program>, state: State) {
-                  const splitUrl = `${splitPrefix}:${state.filename}?${splitPrefix}`
+                  const splitUrl = `${splitPrefix}:${opts.filename}?${splitPrefix}`
 
                   programPath.traverse(
                     {
@@ -348,9 +348,9 @@ export async function splitFile(opts: {
                           ]),
                         )
                       } else {
-                        console.log(splitNode)
+                        console.info(splitNode)
                         throw new Error(
-                          `Unexpected splitNode type: ${splitNode.type}`,
+                          `Unexpected splitNode type ☝️: ${splitNode.type}`,
                         )
                       }
                     }
@@ -359,7 +359,6 @@ export async function splitFile(opts: {
                     // then we need to remove that copy
                     programPath.node.body = programPath.node.body.filter(
                       (node) => {
-                        // console.log(node)
                         return node !== splitNode
                       },
                     )

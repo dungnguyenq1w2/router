@@ -1,18 +1,28 @@
-import { describe, test, expect } from 'vitest'
+import { describe, expect, test } from 'vitest'
+import { render } from '@testing-library/react'
 
-// import {
-//   cleanPath,
-//   // Location,
-//   matchPathname,
-//   ParsedLocation,
-//   parsePathname,
-//   // Route,
-//   // createMemoryHistory,
-//   resolvePath,
-//   Segment,
-//   trimPath,
-//   trimPathLeft,
-// } from '../src'
+import React from 'react'
+
+import {
+  Outlet,
+  RouterProvider,
+  cleanPath,
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  // Location,
+  matchPathname,
+  // ParsedLocation,
+  parsePathname,
+  redirect,
+  // Route,
+  // createMemoryHistory,
+  resolvePath,
+  // Segment,
+  trimPath,
+  trimPathLeft,
+} from '../src'
 
 // import { createTimer, sleep } from './utils'
 
@@ -36,8 +46,6 @@ import { describe, test, expect } from 'vitest'
 //     ...location,
 //   }
 // }
-
-test('it works', () => {})
 
 // describe('Router', () => {
 //   test('mounts to /', async () => {
@@ -548,48 +556,197 @@ test('it works', () => {})
 //   })
 // })
 
-// describe('resolvePath', () => {
-//   describe('basic resolution', () => {
-//     ;[
-//       ['/', '/', '/', '/'],
-//       ['/', '/', '/a', '/a'],
-//       ['/', '/', 'a/', '/a/'],
-//       ['/', '/', '/a/b', '/a/b'],
-//       ['/', 'a', 'b', '/a/b'],
-//       ['/a/b', 'c', '/a/b/c', '/a/b/c'],
-//     ].forEach(([base, a, b, eq]) => {
-//       test(`${a} to ${b} === ${eq}`, () => {
-//         expect(resolvePath(base, a, b)).toEqual(eq)
-//       })
-//     })
-//   })
+describe('ssr redirects', async () => {
+  test('via throw in beforeLoad', async () => {
+    const rootRoute = createRootRoute()
 
-//   describe('relative', () => {
-//     ;[
-//       ['/a/b', '/', './c', '/a/b/c'],
-//       ['/', '/', './a/b', '/a/b'],
-//       ['/', '/a/b/c', './d', '/a/b/c/d'],
-//       ['/', '/a/b/c', '../d', '/a/b/d'],
-//       ['/', '/a/b/c', '../../d', '/a/d'],
-//       ['/', '/a/b/c', '../..', '/a'],
-//       ['/', '/a/b/c/', '../..', '/a'],
-//       ['/', '/a/b/c', '../../..', '/'],
-//       ['/', '/a/b/c/', '../../..', '/'],
-//     ].forEach(([base, a, b, eq]) => {
-//       test(`${a} to ${b} === ${eq}`, () => {
-//         expect(resolvePath(base, a, b)).toEqual(eq)
-//       })
-//     })
-//   })
+    const indexRoute = createRoute({
+      path: '/',
+      getParentRoute: () => rootRoute,
+      beforeLoad: () => {
+        throw redirect({
+          to: '/about',
+        })
+      },
+    })
 
-//   describe('trailing slash', () => {
-//     ;[
-//       ['/', '/a', './b/', '/a/b/'],
-//       ['/', '/', 'a/b/c/', '/a/b/c/'],
-//     ].forEach(([base, a, b, eq]) => {
-//       test(`${a} to ${b} === ${eq}`, () => {
-//         expect(resolvePath(base, a, b)).toEqual(eq)
-//       })
-//     })
-//   })
-// })
+    const aboutRoute = createRoute({
+      path: '/about',
+      getParentRoute: () => rootRoute,
+      component: () => {
+        return 'About'
+      },
+    })
+
+    const router = createRouter({
+      history: createMemoryHistory({
+        initialEntries: ['/'],
+      }),
+      routeTree: rootRoute.addChildren([indexRoute, aboutRoute]),
+    })
+
+    // Mock server mode
+    router.isServer = true
+
+    await router.load()
+
+    expect(router.state.redirect).toEqual({
+      to: '/about',
+      headers: {},
+      href: '/about',
+      isRedirect: true,
+      routeId: '/',
+      routerCode: 'BEFORE_LOAD',
+      statusCode: 301,
+    })
+  })
+  test('via throw in loader', async () => {
+    const rootRoute = createRootRoute()
+
+    const indexRoute = createRoute({
+      path: '/',
+      getParentRoute: () => rootRoute,
+      loader: () => {
+        throw redirect({
+          to: '/about',
+        })
+      },
+    })
+
+    const aboutRoute = createRoute({
+      path: '/about',
+      getParentRoute: () => rootRoute,
+      component: () => {
+        return 'About'
+      },
+    })
+
+    const router = createRouter({
+      history: createMemoryHistory({
+        initialEntries: ['/'],
+      }),
+      routeTree: rootRoute.addChildren([indexRoute, aboutRoute]),
+    })
+
+    // Mock server mode
+    router.isServer = true
+
+    await router.load()
+
+    expect(router.state.redirect).toEqual({
+      to: '/about',
+      headers: {},
+      href: '/about',
+      isRedirect: true,
+      routeId: '/',
+      statusCode: 301,
+    })
+  })
+})
+
+describe('resolvePath', () => {
+  ;(
+    [
+      ['/', '/', '/', '/'],
+      ['/', '/', '/a', '/a'],
+      ['/', '/', 'a/', '/a'],
+      ['/', '/', '/a/b', '/a/b'],
+      ['/', 'a', 'b', '/a/b'],
+      ['/a/b', 'c', '/a/b/c', '/a/b/c'],
+      ['/a/b', '/', 'c', '/a/b/c'],
+      ['/a/b', '/', './c', '/a/b/c'],
+      ['/', '/', 'a/b', '/a/b'],
+      ['/', '/', './a/b', '/a/b'],
+      ['/', '/a/b/c', 'd', '/a/b/c/d'],
+      ['/', '/a/b/c', './d', '/a/b/c/d'],
+      ['/', '/a/b/c', './../d', '/a/b/d'],
+      ['/', '/a/b/c/d', './../d', '/a/b/c/d'],
+      ['/', '/a/b/c', '../d', '/a/b/d'],
+      ['/', '/a/b/c', '../../d', '/a/d'],
+      ['/', '/a/b/c', '..', '/a/b'],
+      ['/', '/a/b/c', '../..', '/a'],
+      ['/', '/a/b/c', '../../..', '/'],
+      ['/', '/a/b/c/', '../../..', '/'],
+    ] as const
+  ).forEach(([base, a, b, eq]) => {
+    test(`Base: ${base} - ${a} to ${b} === ${eq}`, () => {
+      expect(resolvePath({ basepath: base, base: a, to: b })).toEqual(eq)
+    })
+    test(`Base: ${base} - ${a}/ to ${b} === ${eq} (trailing slash)`, () => {
+      expect(resolvePath({ basepath: base, base: a + '/', to: b })).toEqual(eq)
+    })
+    test(`Base: ${base} - ${a}/ to ${b}/ === ${eq} (trailing slash + trailing slash)`, () => {
+      expect(
+        resolvePath({ basepath: base, base: a + '/', to: b + '/' }),
+      ).toEqual(eq)
+    })
+  })
+  describe('trailingSlash', () => {
+    describe(`'always'`, () => {
+      test('keeps trailing slash', () => {
+        expect(
+          resolvePath({
+            basepath: '/',
+            base: '/a/b/c',
+            to: 'd/',
+            trailingSlash: 'always',
+          }),
+        ).toBe('/a/b/c/d/')
+      })
+      test('adds trailing slash', () => {
+        expect(
+          resolvePath({
+            basepath: '/',
+            base: '/a/b/c',
+            to: 'd',
+            trailingSlash: 'always',
+          }),
+        ).toBe('/a/b/c/d/')
+      })
+    })
+    describe(`'never'`, () => {
+      test('removes trailing slash', () => {
+        expect(
+          resolvePath({
+            basepath: '/',
+            base: '/a/b/c',
+            to: 'd/',
+            trailingSlash: 'never',
+          }),
+        ).toBe('/a/b/c/d')
+      })
+      test('does not add trailing slash', () => {
+        expect(
+          resolvePath({
+            basepath: '/',
+            base: '/a/b/c',
+            to: 'd',
+            trailingSlash: 'never',
+          }),
+        ).toBe('/a/b/c/d')
+      })
+    })
+    describe(`'preserve'`, () => {
+      test('keeps trailing slash', () => {
+        expect(
+          resolvePath({
+            basepath: '/',
+            base: '/a/b/c',
+            to: 'd/',
+            trailingSlash: 'preserve',
+          }),
+        ).toBe('/a/b/c/d/')
+      })
+      test('does not add trailing slash', () => {
+        expect(
+          resolvePath({
+            basepath: '/',
+            base: '/a/b/c',
+            to: 'd',
+            trailingSlash: 'preserve',
+          }),
+        ).toBe('/a/b/c/d')
+      })
+    })
+  })
+})

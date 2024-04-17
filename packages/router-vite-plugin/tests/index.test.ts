@@ -1,8 +1,8 @@
 import { readFile, readdir } from 'fs/promises'
 import path from 'path'
 import { expect, test } from 'vitest'
-import { compileFile, makeCompile, splitFile } from '../compilers'
-import { splitPrefix } from '../constants'
+import { compileFile, makeCompile, splitFile } from '../src/compilers'
+import { splitPrefix } from '../src/constants'
 
 test('it compiles and splits', async () => {
   // get the list of files from the /test-files directory
@@ -19,21 +19,23 @@ async function compileTestFile(opts: { file: string }) {
     await readFile(path.resolve(__dirname, `./test-files/${opts.file}`))
   ).toString()
 
+  const filename = opts.file.replace(__dirname, '')
+
   // console.log('Compiling...')
   // console.log('⬇️⬇️⬇️⬇️⬇️')
   // console.log()
   const result = await compileFile({
     code,
     compile: makeCompile({
-      root: path.resolve(__dirname, './test-files'),
+      root: './test-files',
     }),
-    filename: `${opts.file}`,
+    filename,
   })
 
   // console.log(result.code)
   // console.log()
 
-  await expect(result.code).toMatchFileSnapshot(`./snapshots/${opts.file}`)
+  await expect(result.code).toMatchFileSnapshot(`./snapshots/${filename}`)
 }
 
 async function splitTestFile(opts: { file: string }) {
@@ -41,20 +43,22 @@ async function splitTestFile(opts: { file: string }) {
     await readFile(path.resolve(__dirname, `./test-files/${opts.file}`))
   ).toString()
 
+  const filename = opts.file.replace(__dirname, '')
+
   // console.log('Splitting...')
   // console.log('⬇️⬇️⬇️⬇️⬇️')
   // console.log()
   const result = await splitFile({
     code,
     compile: makeCompile({
-      root: path.resolve(__dirname, './test-files'),
+      root: './test-files',
     }),
-    filename: `${opts.file}?${splitPrefix}`,
+    filename: `${filename}?${splitPrefix}`,
   })
 
   // console.log(result.code)
   // console.log()
   await expect(result.code).toMatchFileSnapshot(
-    `./snapshots/${opts.file.replace('.tsx', '')}?split.tsx`,
+    `./snapshots/${filename.replace('.tsx', '')}?split.tsx`,
   )
 }

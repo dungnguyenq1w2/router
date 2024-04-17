@@ -1,8 +1,4 @@
-import {
-  getRenderedMatches,
-  useRouter,
-  useRouterState,
-} from '@tanstack/react-router'
+import { useRouter, useRouterState } from '@tanstack/react-router'
 import * as React from 'react'
 import { Asset } from './Asset'
 import type { RouterManagedTag } from './RouterManagedTag'
@@ -12,9 +8,7 @@ export const Meta = () => {
 
   const routeMeta = useRouterState({
     select: (state) => {
-      return getRenderedMatches(state)
-        .map((match) => match.meta!)
-        .filter(Boolean)
+      return state.matches.map((match) => match.meta!).filter(Boolean)
     },
   })
 
@@ -61,7 +55,7 @@ export const Meta = () => {
 
   const links = useRouterState({
     select: (state) =>
-      getRenderedMatches(state)
+      state.matches
         .map((match) => match.links!)
         .filter(Boolean)
         .flat(1)
@@ -73,13 +67,29 @@ export const Meta = () => {
         })) as Array<RouterManagedTag>,
   })
 
-  const manifestMeta = router.options.context?.assets.filter(
-    (d: any) => d.tag !== 'script',
-  ) as Array<RouterManagedTag>
+  const manifestMeta =
+    (
+      router.options.context?.assets?.filter((d: any) => d.tag !== 'script') as
+        | Array<RouterManagedTag>
+        | undefined
+    )?.map(({ tag, children, attrs }) => {
+      const { key, ...rest } = attrs || {}
+      return {
+        tag,
+        attrs: rest,
+        children,
+      }
+    }) ?? []
+
+  const allMeta = [
+    ...meta,
+    ...links,
+    ...manifestMeta,
+  ] as Array<RouterManagedTag>
 
   return (
     <>
-      {[...meta, ...links, ...manifestMeta].map((asset, i) => (
+      {allMeta.map((asset, i) => (
         <Asset {...asset} key={`tsr-meta-${asset.tag}-${i}`} />
       ))}
     </>

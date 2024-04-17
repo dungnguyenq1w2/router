@@ -1,4 +1,4 @@
-import { isAbsolute, join, normalize } from 'path'
+import { isAbsolute, join, normalize, resolve } from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 import { z } from 'zod'
 import {
@@ -22,7 +22,7 @@ export const configSchema = generatorConfigSchema.extend({
 export type Config = z.infer<typeof configSchema>
 
 const CONFIG_FILE_NAME = 'tsr.config.json'
-const debug = true as any
+const debug = false as any
 
 const getConfig = async (inlineConfig: Partial<Config>, root: string) => {
   const config = await getGeneratorConfig(inlineConfig, root)
@@ -39,6 +39,8 @@ export function TanStackRouterVite(
   ]
 }
 
+let lock = false
+
 export function TanStackRouterViteGenerator(
   inlineConfig: Partial<Config> = {},
 ): Plugin {
@@ -46,18 +48,33 @@ export function TanStackRouterViteGenerator(
   let userConfig: Config
 
   const generate = async () => {
+    if (lock) {
+      return
+    }
+    lock = true
     try {
       await generator(userConfig)
     } catch (err) {
       console.error(err)
       console.info()
     }
+    lock = false
   }
 
-  const handleFile = async (file: string) => {
+  const handleFile = async (
+    file: string,
+    event: 'create' | 'update' | 'delete',
+  ) => {
     const filePath = normalize(file)
     if (filePath === join(ROOT, CONFIG_FILE_NAME)) {
       userConfig = await getConfig(inlineConfig, ROOT)
+      return
+    }
+    if (
+      event === 'update' &&
+      filePath === resolve(userConfig.generatedRouteTree)
+    ) {
+      // skip generating routes if the generated route tree is updated
       return
     }
     const routesDirectoryPath = isAbsolute(userConfig.routesDirectory)
@@ -81,7 +98,7 @@ export function TanStackRouterViteGenerator(
     watchChange: async (file, context) => {
       if (userConfig.enableRouteGeneration ?? true) {
         if (['create', 'update', 'delete'].includes(context.event)) {
-          await handleFile(file)
+          await handleFile(file, context.event)
         }
       }
     },
