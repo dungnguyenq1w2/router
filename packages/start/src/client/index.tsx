@@ -1,3 +1,4 @@
+/// <reference types="vinxi/types/client" />
 export { Asset } from './Asset'
 export {
   serverFnPayloadTypeHeader,
@@ -13,9 +14,8 @@ export {
   type JsonResponseOrPayload,
 } from './createServerFn'
 export { DehydrateRouter } from './DehydrateRouter'
-export { getManifestAssets } from './getManifestAssets'
 export { json } from './json'
-export { Meta } from './Meta'
+export { Meta, Html, Head, Body } from './Meta'
 export { type RouterManagedTag } from './RouterManagedTag'
 export { Scripts } from './Scripts'
 export { StartClient } from './StartClient'

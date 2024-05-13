@@ -17,7 +17,6 @@ export function StartServer<TRouter extends AnyRouter>(props: {
   )
 
   return (
-    // Provide the hydration context still, since `<DehydrateRouter />` needs it.
     <hydrationContext.Provider value={hydrationCtxValue}>
       <RouterProvider router={props.router} />
     </hydrationContext.Provider>

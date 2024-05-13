@@ -1,15 +1,15 @@
 {
-  "name": "@tanstack/react-router-server",
-  "version": "1.28.4",
+  "name": "@tanstack/start",
+  "version": "1.32.1",
   "description": "",
   "author": "Tanner Linsley",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/TanStack/router.git",
-    "directory": "packages/history"
+    "directory": "packages/start"
   },
-  "homepage": "https://tanstack.com/react-router-server",
+  "homepage": "https://tanstack.com/start",
   "funding": {
     "type": "github",
     "url": "https://github.com/sponsors/tannerlinsley"

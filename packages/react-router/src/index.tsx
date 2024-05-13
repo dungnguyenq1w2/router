@@ -181,6 +181,7 @@ export {
   type TrimPath,
   type TrimPathLeft,
   type TrimPathRight,
+  type RootRouteOptions,
 } from './route'
 export {
   type ParseRoute,
@@ -224,6 +225,7 @@ export {
 } from './router'
 export {
   RouterProvider,
+  RouterContextProvider,
   getRouteMatch,
   type RouterProps,
   type CommitLocationOptions,
@@ -256,6 +258,7 @@ export {
 export { useRouteContext } from './useRouteContext'
 export { useRouter } from './useRouter'
 export { useRouterState } from './useRouterState'
+export { useLocation } from './useLocation'
 export {
   escapeJSON, // SSR
   useLayoutEffect, // SSR

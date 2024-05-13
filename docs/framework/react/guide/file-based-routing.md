@@ -87,12 +87,14 @@ If these defaults work for your project, you don't need to configure anything at
 
 The following options are available for configuration via the `tsr.config.json` file:
 
+> **🚨 Important:** Do not set the `routeFilePrefix`, `routeFileIgnorePrefix`, or `routeFileIgnorePattern` options, to match any of the tokens used in the [file-naming conventions](#file-naming-conventions) section.
+
 - **`routeFilePrefix`**
   - (Optional) If set, only route files and directories that start with this string will be considered for routing.
 - **`routeFileIgnorePrefix`**
   - (Optional, **Defaults to `-`**) Route files and directories that start with this string will be ignored. By default this is set to `-` to allow for the use of directories to house related files that do not contain any route files.
 - **`routeFileIgnorePattern`**
-  - (Optional) Ignore specific file and directories in the route directory. It can be used in regular expression format. For example `.((css|const).ts)|test-page` can ignore `.css.ts` and `.const.ts` file and ignore file and directories includes name with `test-page`
+  - (Optional) Ignore specific files and directories in the route directory. It can be used in regular expression format. For example, `.((css|const).ts)|test-page` will ignore files / directories with names containing `.css.ts`, `.const.ts` or `test-page`.
 - **`routesDirectory`**
   - (Required) The directory containing the routes relative to the cwd.
 - **`generatedRouteTree`**
@@ -109,10 +111,33 @@ The following options are available for configuration via the `tsr.config.json` 
   - (Optional, **Defaults to `false`**) add file extensions to the route names in the generated route tree
 - **`disableLogging`**
   - (Optional, **Defaults to `false`**) disables logging for the route generation process
+- **`routeTreeFileHeader`**
+
+  - (Optional) An array of strings to prepend to the generated route tree file content.
+  - Default:
+  - ```
+    [
+      '/* prettier-ignore-start */',
+      '/* eslint-disable */',
+      '// @ts-nocheck',
+      '// noinspection JSUnusedGlobalSymbols'
+    ]
+    ```
+
+- **`routeTreeFileFooter`**
+  - (Optional) An array of strings to append to the generated route tree file content.
+  - Default:
+  - ```
+    [
+      '/* prettier-ignore-end */'
+    ]
+    ```
 
 ## File Naming Conventions
 
 File-based routing requires that you follow a few simple file naming conventions to ensure that your routes are generated correctly. The concepts these conventions enable are covered in detail in the [Route Trees & Nesting](../route-trees) guide.
+
+> **💡 Remember:** The file-naming conventions for your project could be affected by what [options](#options) are configured in your `tsr.config.json`. By default, the `routeFileIgnorePrefix` option is set to `-`, as such files and directories starting with `-` will not be considered for routing.
 
 - **`__root.tsx`**
   - The root route file must be named `__root.tsx` and must be placed in the root of the configured `routesDirectory`.

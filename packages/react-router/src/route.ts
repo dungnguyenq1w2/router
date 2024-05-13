@@ -7,12 +7,11 @@ import { notFound } from './not-found'
 import { useNavigate } from './useNavigate'
 import type { UseNavigateResult } from './useNavigate'
 import type * as React from 'react'
-import type { RouteMatch } from './Matches'
-import type { AnyRouteMatch } from './Matches'
+import type { MakeRouteMatch, RouteMatch } from './Matches'
 import type { NavigateOptions, ParsePathParams, ToSubOptions } from './link'
 import type { ParsedLocation } from './location'
 import type { RouteById, RouteIds, RoutePaths } from './routeInfo'
-import type { AnyRouter, RegisteredRouter } from './router'
+import type { AnyRouter, RegisteredRouter, Router } from './router'
 import type {
   Assign,
   Expand,
@@ -93,9 +92,13 @@ export type RouteOptions<
   TLoaderDataReturn
 > &
   UpdatableRouteOptions<
+    NoInfer<TCustomId>,
     NoInfer<TAllParams>,
     NoInfer<TFullSearchSchema>,
-    NoInfer<TLoaderData>
+    NoInfer<TLoaderData>,
+    NoInfer<TAllContext>,
+    NoInfer<TRouteContext>,
+    NoInfer<TLoaderDeps>
   >
 
 export type ParamsFallback<
@@ -221,44 +224,61 @@ type BeforeLoadFn<
   cause: 'preload' | 'enter' | 'stay'
 }) => Promise<TRouteContextReturn> | TRouteContextReturn | void
 
-export type UpdatableRouteOptions<TAllParams, TFullSearchSchema, TLoaderData> =
-  {
-    // test?: (args: TAllContext) => void
-    // If true, this route will be matched as case-sensitive
-    caseSensitive?: boolean
-    // If true, this route will be forcefully wrapped in a suspense boundary
-    wrapInSuspense?: boolean
-    // The content to be rendered when the route is matched. If no component is provided, defaults to `<Outlet />`
-    component?: RouteComponent
-    errorComponent?: false | null | ErrorRouteComponent
-    notFoundComponent?: NotFoundRouteComponent
-    pendingComponent?: RouteComponent
-    pendingMs?: number
-    pendingMinMs?: number
-    staleTime?: number
-    gcTime?: number
-    preloadStaleTime?: number
-    preloadGcTime?: number
-    // Filter functions that can manipulate search params *before* they are passed to links and navigate
-    // calls that match this route.
-    preSearchFilters?: Array<SearchFilter<TFullSearchSchema>>
-    // Filter functions that can manipulate search params *after* they are passed to links and navigate
-    // calls that match this route.
-    postSearchFilters?: Array<SearchFilter<TFullSearchSchema>>
-    onError?: (err: any) => void
-    // These functions are called as route matches are loaded, stick around and leave the active
-    // matches
-    onEnter?: (match: AnyRouteMatch) => void
-    onStay?: (match: AnyRouteMatch) => void
-    onLeave?: (match: AnyRouteMatch) => void
-    meta?: (ctx: {
-      params: TAllParams
-      loaderData: TLoaderData
-    }) => Array<JSX.IntrinsicElements['meta']>
-    links?: () => Array<JSX.IntrinsicElements['link']>
-    scripts?: () => Array<JSX.IntrinsicElements['script']>
-    headers?: (ctx: { loaderData: TLoaderData }) => Record<string, string>
-  } & UpdatableStaticRouteOption
+export type UpdatableRouteOptions<
+  TRouteId,
+  TAllParams,
+  TFullSearchSchema,
+  TLoaderData,
+  TAllContext,
+  TRouteContext,
+  TLoaderDeps,
+  TRouteMatch = RouteMatch<
+    TRouteId,
+    TAllParams,
+    TFullSearchSchema,
+    TLoaderData,
+    TAllContext,
+    TRouteContext,
+    TLoaderDeps
+  >,
+> = {
+  // test?: (args: TAllContext) => void
+  // If true, this route will be matched as case-sensitive
+  caseSensitive?: boolean
+  // If true, this route will be forcefully wrapped in a suspense boundary
+  wrapInSuspense?: boolean
+  // The content to be rendered when the route is matched. If no component is provided, defaults to `<Outlet />`
+  component?: RouteComponent
+  errorComponent?: false | null | ErrorRouteComponent
+  notFoundComponent?: NotFoundRouteComponent
+  pendingComponent?: RouteComponent
+  pendingMs?: number
+  pendingMinMs?: number
+  staleTime?: number
+  gcTime?: number
+  preloadStaleTime?: number
+  preloadGcTime?: number
+  // Filter functions that can manipulate search params *before* they are passed to links and navigate
+  // calls that match this route.
+  preSearchFilters?: Array<SearchFilter<TFullSearchSchema>>
+  // Filter functions that can manipulate search params *after* they are passed to links and navigate
+  // calls that match this route.
+  postSearchFilters?: Array<SearchFilter<TFullSearchSchema>>
+  onError?: (err: any) => void
+  // These functions are called as route matches are loaded, stick around and leave the active
+  // matches
+  onEnter?: (match: TRouteMatch) => void
+  onStay?: (match: TRouteMatch) => void
+  onLeave?: (match: TRouteMatch) => void
+  meta?: (ctx: {
+    matches: Array<TRouteMatch>
+    params: TAllParams
+    loaderData: TLoaderData
+  }) => Array<JSX.IntrinsicElements['meta']>
+  links?: () => Array<JSX.IntrinsicElements['link']>
+  scripts?: () => Array<JSX.IntrinsicElements['script']>
+  headers?: (ctx: { loaderData: TLoaderData }) => Record<string, string>
+} & UpdatableStaticRouteOption
 
 export type UpdatableStaticRouteOption =
   {} extends PickRequired<StaticDataRouteOption>
@@ -341,7 +361,7 @@ export interface LoaderFnContext<
   /**
    * @deprecated Use `throw redirect({ to: '/somewhere' })` instead
    **/
-  navigate: (opts: NavigateOptions<AnyRoute>) => Promise<void>
+  navigate: (opts: NavigateOptions<AnyRouter>) => Promise<void>
   parentMatchPromise?: Promise<void>
   cause: 'preload' | 'enter' | 'stay'
   route: Route
@@ -483,10 +503,10 @@ export class RouteApi<
 
   useMatch = <
     TRouteTree extends AnyRoute = RegisteredRouter['routeTree'],
-    TRouteMatchState = RouteMatch<TRouteTree, TId>,
-    TSelected = TRouteMatchState,
+    TRouteMatch = MakeRouteMatch<TRouteTree, TId>,
+    TSelected = TRouteMatch,
   >(opts?: {
-    select?: (match: TRouteMatchState) => TSelected
+    select?: (match: TRouteMatch) => TSelected
   }): TSelected => {
     return useMatch({ select: opts?.select, from: this.id })
   }
@@ -806,7 +826,15 @@ export class Route<
   }
 
   update = (
-    options: UpdatableRouteOptions<TAllParams, TFullSearchSchema, TLoaderData>,
+    options: UpdatableRouteOptions<
+      TCustomId,
+      TAllParams,
+      TFullSearchSchema,
+      TLoaderData,
+      TAllContext,
+      TRouteContext,
+      TLoaderDeps
+    >,
   ): this => {
     Object.assign(this.options, options)
     return this
@@ -819,10 +847,10 @@ export class Route<
 
   useMatch = <
     TRouteTree extends AnyRoute = RegisteredRouter['routeTree'],
-    TRouteMatchState = RouteMatch<TRouteTree, TId>,
-    TSelected = TRouteMatchState,
+    TRouteMatch = MakeRouteMatch<TRouteTree, TId>,
+    TSelected = TRouteMatch,
   >(opts?: {
-    select?: (match: TRouteMatchState) => TSelected
+    select?: (match: TRouteMatch) => TSelected
   }): TSelected => {
     return useMatch({ ...opts, from: this.id })
   }
@@ -953,6 +981,48 @@ export function createRoute<
 
 export type AnyRootRoute = RootRoute<any, any, any, any, any, any, any, any>
 
+export type RootRouteOptions<
+  TSearchSchemaInput extends Record<string, any> = RootSearchSchema,
+  TSearchSchema extends Record<string, any> = RootSearchSchema,
+  TSearchSchemaUsed extends Record<string, any> = RootSearchSchema,
+  TRouteContextReturn extends RouteContext = RouteContext,
+  TRouteContext extends RouteContext = [TRouteContextReturn] extends [never]
+    ? RouteContext
+    : TRouteContextReturn,
+  TRouterContext extends {} = {},
+  TLoaderDeps extends Record<string, any> = {},
+  TLoaderDataReturn = unknown,
+  TLoaderData = [TLoaderDataReturn] extends [never]
+    ? undefined
+    : TLoaderDataReturn,
+> = Omit<
+  RouteOptions<
+    any, // TParentRoute
+    RootRouteId, // TCustomId
+    '', // TPath
+    TSearchSchemaInput, // TSearchSchemaInput
+    TSearchSchema, // TSearchSchema
+    TSearchSchemaUsed,
+    TSearchSchemaUsed, //TFullSearchSchemaInput
+    TSearchSchema, // TFullSearchSchema
+    {}, // TParams
+    {}, // TAllParams
+    TRouteContextReturn, // TRouteContextReturn
+    TRouteContext, // TRouteContext
+    TRouterContext,
+    Assign<TRouterContext, TRouteContext>, // TAllContext
+    TLoaderDeps,
+    TLoaderDataReturn, // TLoaderDataReturn,
+    TLoaderData // TLoaderData,
+  >,
+  | 'path'
+  | 'id'
+  | 'getParentRoute'
+  | 'caseSensitive'
+  | 'parseParams'
+  | 'stringifyParams'
+>
+
 export function createRootRouteWithContext<TRouterContext extends {}>() {
   return <
     TSearchSchemaInput extends Record<string, any> = RootSearchSchema,
@@ -968,32 +1038,16 @@ export function createRootRouteWithContext<TRouterContext extends {}>() {
       ? undefined
       : TLoaderDataReturn,
   >(
-    options?: Omit<
-      RouteOptions<
-        any, // TParentRoute
-        RootRouteId, // TCustomId
-        '', // TPath
-        TSearchSchemaInput, // TSearchSchemaInput
-        TSearchSchema, // TSearchSchema
-        TSearchSchemaUsed,
-        TSearchSchemaUsed, //TFullSearchSchemaInput
-        TSearchSchema, // TFullSearchSchema
-        {}, // TParams
-        {}, // TAllParams
-        TRouteContextReturn, // TRouteContextReturn
-        TRouteContext, // TRouteContext
-        TRouterContext,
-        Assign<TRouterContext, TRouteContext>, // TAllContext
-        TLoaderDeps,
-        TLoaderDataReturn, // TLoaderDataReturn,
-        TLoaderData // TLoaderData,
-      >,
-      | 'path'
-      | 'id'
-      | 'getParentRoute'
-      | 'caseSensitive'
-      | 'parseParams'
-      | 'stringifyParams'
+    options?: RootRouteOptions<
+      TSearchSchemaInput,
+      TSearchSchema,
+      TSearchSchemaUsed,
+      TRouteContextReturn,
+      TRouteContext,
+      TRouterContext,
+      TLoaderDeps,
+      TLoaderDataReturn,
+      TLoaderData
     >,
   ) => {
     return createRootRoute<
@@ -1060,32 +1114,16 @@ export class RootRoute<
    * @deprecated `RootRoute` is now an internal implementation detail. Use `createRootRoute()` instead.
    */
   constructor(
-    options?: Omit<
-      RouteOptions<
-        any, // TParentRoute
-        RootRouteId, // TCustomId
-        '', // TPath
-        TSearchSchemaInput, // TSearchSchemaInput
-        TSearchSchema, // TSearchSchema
-        TSearchSchemaUsed,
-        TSearchSchemaUsed, // TFullSearchSchemaInput
-        TSearchSchema, // TFullSearchSchema
-        {}, // TParams
-        {}, // TAllParams
-        TRouteContextReturn, // TRouteContextReturn
-        TRouteContext, // TRouteContext
-        TRouterContext,
-        Assign<TRouterContext, TRouteContext>, // TAllContext
-        TLoaderDeps,
-        TLoaderDataReturn,
-        TLoaderData
-      >,
-      | 'path'
-      | 'id'
-      | 'getParentRoute'
-      | 'caseSensitive'
-      | 'parseParams'
-      | 'stringifyParams'
+    options?: RootRouteOptions<
+      TSearchSchemaInput,
+      TSearchSchema,
+      TSearchSchemaUsed,
+      TRouteContextReturn,
+      TRouteContext,
+      TRouterContext,
+      TLoaderDeps,
+      TLoaderDataReturn,
+      TLoaderData
     >,
   ) {
     super(options as any)
@@ -1203,7 +1241,7 @@ export function createRouteMask<
 >(
   opts: {
     routeTree: TRouteTree
-  } & ToSubOptions<TRouteTree, TFrom, TTo>,
+  } & ToSubOptions<Router<TRouteTree, 'never'>, TFrom, TTo>,
 ): RouteMask<TRouteTree> {
   return opts as any
 }
