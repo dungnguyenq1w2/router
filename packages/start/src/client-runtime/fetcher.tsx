@@ -4,7 +4,10 @@ import {
   isPlainObject,
   isRedirect,
 } from '@tanstack/react-router'
-import { serverFnPayloadTypeHeader, serverFnReturnTypeHeader } from '../client'
+import {
+  serverFnPayloadTypeHeader,
+  serverFnReturnTypeHeader,
+} from '../constants'
 import type { CompiledFetcherFnOptions } from '../client'
 
 export async function fetcher<TPayload>(
@@ -107,6 +110,7 @@ export async function fetcher<TPayload>(
     return text
   }
 }
+
 async function handleResponseErrors(response: Response) {
   if (!response.ok) {
     const body = await (async () => {

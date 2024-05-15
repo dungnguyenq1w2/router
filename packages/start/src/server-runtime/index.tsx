@@ -4,9 +4,8 @@ import {
   getResponseHeaders,
   setResponseHeaders,
 } from 'vinxi/http'
-import { getBaseUrl } from '../client/client-runtime'
-import { fetcher } from '../server-fns/fetcher'
-import { handleRequest } from '../server-fns/handler'
+import { handleRequest } from '../server-handler'
+import { fetcher, getBaseUrl } from '../client-runtime'
 import type { FetchFn } from '../client'
 
 export function createServerReference<TPayload, TResponse>(
@@ -42,7 +41,7 @@ export function createServerReference<TPayload, TResponse>(
           }
         })
 
-        setResponseHeaders(event, ogResponseHeaders)
+        setResponseHeaders(event, ogResponseHeaders as any)
       }
 
       return response
