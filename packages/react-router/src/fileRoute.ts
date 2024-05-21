@@ -1,6 +1,8 @@
 import warning from 'tiny-warning'
 import { createRoute } from './route'
-import { useLoaderData, useLoaderDeps, useMatch } from './Matches'
+import { useMatch } from './useMatch'
+import { useLoaderDeps } from './useLoaderDeps'
+import { useLoaderData } from './useLoaderData'
 import { useSearch } from './useSearch'
 import { useParams } from './useParams'
 import { useNavigate } from './useNavigate'
@@ -18,7 +20,6 @@ import type {
   ResolveLoaderData,
   ResolveRouteContext,
   ResolveSearchSchemaUsed,
-  RootRouteId,
   Route,
   RouteConstraints,
   RouteContext,
@@ -32,6 +33,7 @@ import type { MakeRouteMatch } from './Matches'
 import type { NoInfer } from '@tanstack/react-store'
 import type { RegisteredRouter } from './router'
 import type { RouteById, RouteIds } from './routeInfo'
+import type { RootRouteId } from './root'
 
 export interface FileRoutesByPath {
   // '/': {

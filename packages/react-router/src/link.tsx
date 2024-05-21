@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { flushSync } from 'react-dom'
-import { useMatch } from './Matches'
+import { useMatch } from './useMatch'
 import { useRouterState } from './useRouterState'
 import { useRouter } from './useRouter'
 import { deepEqual, exactPathTest, functionalUpdate } from './utils'
@@ -14,7 +14,6 @@ import type {
   RouteByPath,
   RouteByToPath,
   RoutePaths,
-  RoutePathsAutoComplete,
   RouteToPath,
 } from './routeInfo'
 import type { RegisteredRouter } from './router'
@@ -227,7 +226,7 @@ export interface ToSubOptionsProps<
   hash?: true | Updater<string>
   state?: true | NonNullableUpdater<HistoryState>
   // The source route path. This is automatically set when using route-level APIs, but for type-safe relative routing on the router itself, this is required
-  from?: RoutePathsAutoComplete<TRouter, TFrom> & {}
+  from?: FromPathOption<TRouter, TFrom> & {}
 }
 
 export type ParamsReducerFn<
@@ -422,6 +421,26 @@ export type ToPathOption<
       NoInfer<TFrom> extends string ? NoInfer<TFrom> : '',
       NoInfer<TTo> & string
     >
+
+export type CheckFromPath<
+  TRouter extends AnyRouter,
+  TPass,
+  TFail,
+  TFrom,
+> = string extends TFrom
+  ? TPass
+  : RouteByPath<TRouter['routeTree'], TFrom> extends never
+    ? TFail
+    : TPass
+
+export type FromPathOption<TRouter extends AnyRouter, TFrom> =
+  | CheckFromPath<
+      TRouter,
+      string extends TFrom ? TFrom & {} : TFrom,
+      never,
+      TFrom
+    >
+  | RoutePaths<TRouter['routeTree']>
 
 export interface ActiveOptions {
   exact?: boolean
@@ -777,11 +796,17 @@ export type ActiveLinkOptions<
 > = LinkOptions<TRouter, TFrom, TTo, TMaskFrom, TMaskTo> & ActiveLinkOptionProps
 
 export interface ActiveLinkOptionProps {
-  // A function that returns additional props for the `active` state of this link. These props override other props passed to the link (`style`'s are merged, `className`'s are concatenated)
+  /**
+   * A function that returns additional props for the `active` state of this link.
+   * These props override other props passed to the link (`style`'s are merged, `className`'s are concatenated)
+   */
   activeProps?:
     | React.AnchorHTMLAttributes<HTMLAnchorElement>
     | (() => React.AnchorHTMLAttributes<HTMLAnchorElement>)
-  // A function that returns additional props for the `inactive` state of this link. These props override other props passed to the link (`style`'s are merged, `className`'s are concatenated)
+  /**
+   * A function that returns additional props for the `inactive` state of this link.
+   * These props override other props passed to the link (`style`'s are merged, `className`'s are concatenated)
+   */
   inactiveProps?:
     | React.AnchorHTMLAttributes<HTMLAnchorElement>
     | (() => React.AnchorHTMLAttributes<HTMLAnchorElement>)
@@ -809,7 +834,7 @@ export interface LinkPropsChildren {
 type LinkComponentReactProps<TComp> = React.PropsWithoutRef<
   TComp extends React.FC<infer TProps> | React.Component<infer TProps>
     ? TProps
-    : TComp extends keyof JSX.IntrinsicElements
+    : TComp extends keyof React.JSX.IntrinsicElements
       ? Omit<React.HTMLProps<TComp>, 'children' | 'preload'>
       : never
 > &
@@ -818,7 +843,7 @@ type LinkComponentReactProps<TComp> = React.PropsWithoutRef<
       | React.FC<{ ref: infer TRef }>
       | React.Component<{ ref: infer TRef }>
       ? TRef
-      : TComp extends keyof JSX.IntrinsicElements
+      : TComp extends keyof React.JSX.IntrinsicElements
         ? React.ComponentRef<TComp>
         : never
   >

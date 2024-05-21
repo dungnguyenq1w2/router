@@ -74,12 +74,9 @@ export {
   Outlet,
   useMatchRoute,
   MatchRoute,
-  useMatch,
   useMatches,
   useParentMatches,
   useChildMatches,
-  useLoaderDeps,
-  useLoaderData,
   isServerSideError,
   defaultDeserializeError,
   type RouteMatch,
@@ -88,6 +85,9 @@ export {
   type UseMatchRouteOptions,
   type MakeMatchRouteOptions,
 } from './Matches'
+export { useMatch } from './useMatch'
+export { useLoaderDeps } from './useLoaderDeps'
+export { useLoaderData } from './useLoaderData'
 export {
   joinPaths,
   cleanPath,
@@ -110,8 +110,8 @@ export {
   type Redirect,
   type ResolvedRedirect,
 } from './redirects'
+export { rootRouteId, type RootRouteId } from './root'
 export {
-  rootRouteId,
   RouteApi,
   getRouteApi,
   Route,
@@ -122,7 +122,6 @@ export {
   createRootRouteWithContext,
   createRouteMask,
   NotFoundRoute,
-  type RootRouteId,
   type AnyPathParams,
   type SearchSchemaInput,
   type AnySearchSchema,
@@ -183,7 +182,6 @@ export {
   type RoutesByPath,
   type RouteByPath,
   type RoutePaths,
-  type RoutePathsAutoComplete,
   type FullSearchSchema,
   type AllParams,
 } from './routeInfo'
@@ -201,6 +199,7 @@ export {
   type RegisteredRouter,
   type HydrationCtx,
   type RouterContextOptions,
+  type TrailingSlashOption,
   type RouterOptions,
   type RouterTransformer,
   type RouterErrorSerializer,

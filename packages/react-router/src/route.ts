@@ -1,10 +1,14 @@
 import invariant from 'tiny-invariant'
-import { useLoaderData, useLoaderDeps, useMatch } from './Matches'
+import { useMatch } from './useMatch'
+import { useLoaderDeps } from './useLoaderDeps'
+import { useLoaderData } from './useLoaderData'
 import { joinPaths, trimPathLeft } from './path'
 import { useParams } from './useParams'
 import { useSearch } from './useSearch'
 import { notFound } from './not-found'
 import { useNavigate } from './useNavigate'
+import { rootRouteId } from './root'
+import type { RootRouteId } from './root'
 import type { UseNavigateResult } from './useNavigate'
 import type * as React from 'react'
 import type { MakeRouteMatch, RouteMatch } from './Matches'
@@ -24,8 +28,6 @@ import type { BuildLocationFn, NavigateFn } from './RouterProvider'
 import type { NotFoundError } from './not-found'
 import type { LazyRoute } from './fileRoute'
 
-export const rootRouteId = '__root__' as const
-export type RootRouteId = typeof rootRouteId
 export type AnyPathParams = {}
 
 export type SearchSchemaInput = {
@@ -264,6 +266,7 @@ export type UpdatableRouteOptions<
   // Filter functions that can manipulate search params *after* they are passed to links and navigate
   // calls that match this route.
   postSearchFilters?: Array<SearchFilter<TFullSearchSchema>>
+  onCatch?: (error: Error, errorInfo: React.ErrorInfo) => void
   onError?: (err: any) => void
   // These functions are called as route matches are loaded, stick around and leave the active
   // matches
@@ -274,9 +277,9 @@ export type UpdatableRouteOptions<
     matches: Array<TRouteMatch>
     params: TAllParams
     loaderData: TLoaderData
-  }) => Array<JSX.IntrinsicElements['meta']>
-  links?: () => Array<JSX.IntrinsicElements['link']>
-  scripts?: () => Array<JSX.IntrinsicElements['script']>
+  }) => Array<React.JSX.IntrinsicElements['meta']>
+  links?: () => Array<React.JSX.IntrinsicElements['link']>
+  scripts?: () => Array<React.JSX.IntrinsicElements['script']>
   headers?: (ctx: { loaderData: TLoaderData }) => Record<string, string>
 } & UpdatableStaticRouteOption
 
@@ -1279,7 +1282,7 @@ export type ErrorRouteProps = {
 }
 
 export type ErrorComponentProps = {
-  error: unknown
+  error: Error
   info?: { componentStack: string }
   reset: () => void
 }
