@@ -26,8 +26,9 @@ export async function handleRequest(request: Request) {
   if (serverFnId && serverFnName) {
     invariant(typeof serverFnId === 'string', 'Invalid server action')
 
-    console.info(`ServerFn Request: ${serverFnId} - ${serverFnName}`)
-    console.info()
+    if (process.env.NODE_ENV === 'development')
+      console.info(`ServerFn Request: ${serverFnId} - ${serverFnName}`)
+    if (process.env.NODE_ENV === 'development') console.info()
 
     const action = (await getManifest('server').chunks[serverFnId]?.import())?.[
       serverFnName
@@ -116,7 +117,8 @@ export async function handleRequest(request: Request) {
       }
     })()
 
-    console.info(`ServerFn Response: ${response.status}`)
+    if (process.env.NODE_ENV === 'development')
+      console.info(`ServerFn Response: ${response.status}`)
     if (
       response.status === 200 &&
       response.headers.get('Content-Type') === 'application/json'
@@ -125,11 +127,12 @@ export async function handleRequest(request: Request) {
       const text = await cloned.text()
       const payload = text ? JSON.stringify(JSON.parse(text)) : 'undefined'
 
-      console.info(
-        ` - Payload: ${payload.length > 100 ? payload.substring(0, 100) + '...' : payload}`,
-      )
+      if (process.env.NODE_ENV === 'development')
+        console.info(
+          ` - Payload: ${payload.length > 100 ? payload.substring(0, 100) + '...' : payload}`,
+        )
     }
-    console.info()
+    if (process.env.NODE_ENV === 'development') console.info()
 
     return response
   } else {

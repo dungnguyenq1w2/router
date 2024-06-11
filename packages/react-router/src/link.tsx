@@ -3,14 +3,15 @@ import { flushSync } from 'react-dom'
 import { useMatch } from './useMatch'
 import { useRouterState } from './useRouterState'
 import { useRouter } from './useRouter'
-import { deepEqual, exactPathTest, functionalUpdate } from './utils'
+import { deepEqual, functionalUpdate } from './utils'
+import { exactPathTest, removeTrailingSlash } from './path'
 import type { AnyRouter, ParsedLocation } from '.'
 import type { HistoryState } from '@tanstack/history'
-import type { AnyRoute, RootSearchSchema } from './route'
 import type {
+  AllParams,
   CatchAllPaths,
-  ParseRoute,
-  ParseRouteWithoutBranches,
+  FullSearchSchema,
+  FullSearchSchemaInput,
   RouteByPath,
   RouteByToPath,
   RoutePaths,
@@ -249,43 +250,33 @@ type ParamsReducer<
 
 type ParamVariant = 'PATH' | 'SEARCH'
 
-type ExcludeRootSearchSchema<T> =
-  Exclude<T, RootSearchSchema> extends never ? {} : Exclude<T, RootSearchSchema>
-
 export type ResolveRoute<
   TRouter extends AnyRouter,
   TFrom,
   TTo,
   TPath = ResolveRelativePath<TFrom, TTo>,
-> = string extends TPath
-  ? ParseRouteWithoutBranches<TRouter['routeTree']>
-  : TPath extends CatchAllPaths
-    ? ParseRouteWithoutBranches<TRouter['routeTree']>
-    : TPath extends string
-      ? string extends TTo
-        ? RouteByPath<TRouter['routeTree'], TPath>
-        : RouteByToPath<TRouter, TPath>
-      : never
-
-type PostProcessParams<
-  T,
-  TParamVariant extends ParamVariant,
-> = TParamVariant extends 'SEARCH' ? ExcludeRootSearchSchema<T> : T
+> = TPath extends string
+  ? string extends TTo
+    ? RouteByPath<TRouter['routeTree'], TPath>
+    : RouteByToPath<TRouter, TPath>
+  : never
 
 type ResolveFromParamType<TParamVariant extends ParamVariant> =
   TParamVariant extends 'PATH' ? 'allParams' : 'fullSearchSchema'
+
+type ResolveFromAllParams<
+  TRouter extends AnyRouter,
+  TParamVariant extends ParamVariant,
+> = TParamVariant extends 'PATH'
+  ? AllParams<TRouter['routeTree']>
+  : FullSearchSchema<TRouter['routeTree']>
 
 type ResolveFromParams<
   TRouter extends AnyRouter,
   TParamVariant extends ParamVariant,
   TFrom,
 > = string extends TFrom
-  ? PostProcessParams<
-      ParseRoute<
-        TRouter['routeTree']
-      >['types'][ResolveFromParamType<TParamVariant>],
-      TParamVariant
-    >
+  ? ResolveFromAllParams<TRouter, TParamVariant>
   : RouteByPath<
       TRouter['routeTree'],
       TFrom
@@ -294,16 +285,30 @@ type ResolveFromParams<
 type ResolveToParamType<TParamVariant extends ParamVariant> =
   TParamVariant extends 'PATH' ? 'allParams' : 'fullSearchSchemaInput'
 
+type ResolveAllToParams<
+  TRouter extends AnyRouter,
+  TParamVariant extends ParamVariant,
+> = TParamVariant extends 'PATH'
+  ? AllParams<TRouter['routeTree']>
+  : FullSearchSchemaInput<TRouter['routeTree']>
+
 export type ResolveToParams<
   TRouter extends AnyRouter,
   TParamVariant extends ParamVariant,
   TFrom,
   TTo,
-  TRoute extends AnyRoute = ResolveRoute<TRouter, TFrom, TTo>,
-> = PostProcessParams<
-  TRoute['types'][ResolveToParamType<TParamVariant>],
-  TParamVariant
->
+> =
+  ResolveRelativePath<TFrom, TTo> extends infer TPath
+    ? string extends TPath
+      ? ResolveAllToParams<TRouter, TParamVariant>
+      : TPath extends CatchAllPaths
+        ? ResolveAllToParams<TRouter, TParamVariant>
+        : ResolveRoute<
+            TRouter,
+            TFrom,
+            TTo
+          >['types'][ResolveToParamType<TParamVariant>]
+    : never
 
 type ResolveRelativeToParams<
   TRouter extends AnyRouter,
@@ -369,14 +374,8 @@ export interface MakeRequiredSearchParams<
   search: MakeRequiredParamsReducer<TRouter, 'SEARCH', TFrom, TTo> & {}
 }
 
-export type IsRequiredParams<TParams> = keyof TParams extends infer K extends
-  keyof TParams
-  ? K extends any
-    ? undefined extends TParams[K]
-      ? never
-      : true
-    : never
-  : never
+export type IsRequiredParams<TParams> =
+  Record<never, never> extends TParams ? never : true
 
 export type IsRequired<
   TRouter extends AnyRouter,
@@ -384,13 +383,15 @@ export type IsRequired<
   TFrom,
   TTo,
 > =
-  string extends ResolveRelativePath<TFrom, TTo>
-    ? never
-    : ResolveRelativePath<TFrom, TTo> extends CatchAllPaths
+  ResolveRelativePath<TFrom, TTo> extends infer TPath
+    ? string extends TPath
       ? never
-      : IsRequiredParams<
-          ResolveRelativeToParams<TRouter, TParamVariant, TFrom, TTo>
-        >
+      : TPath extends CatchAllPaths
+        ? never
+        : IsRequiredParams<
+            ResolveRelativeToParams<TRouter, TParamVariant, TFrom, TTo>
+          >
+    : never
 
 export type SearchParamOptions<
   TRouter extends AnyRouter,
@@ -584,11 +585,6 @@ export function useLinkProps<
   // If this `to` is a valid external URL, return
   // null for LinkUtils
 
-  const dest = {
-    ...(options.to && { from: matchPathname }),
-    ...options,
-  }
-
   let type: 'internal' | 'external' = 'internal'
 
   try {
@@ -596,7 +592,7 @@ export function useLinkProps<
     type = 'external'
   } catch {}
 
-  const next = router.buildLocation(dest as any)
+  const next = router.buildLocation(options as any)
   const preload = userPreload ?? router.options.defaultPreload
   const preloadDelay =
     userPreloadDelay ?? router.options.defaultPreloadDelay ?? 0
@@ -604,14 +600,20 @@ export function useLinkProps<
   const isActive = useRouterState({
     select: (s) => {
       // Compare path/hash for matches
-      const currentPathSplit = s.location.pathname.split('/')
-      const nextPathSplit = next.pathname.split('/')
+      const currentPathSplit = removeTrailingSlash(
+        s.location.pathname,
+        router.basepath,
+      ).split('/')
+      const nextPathSplit = removeTrailingSlash(
+        next.pathname,
+        router.basepath,
+      ).split('/')
       const pathIsFuzzyEqual = nextPathSplit.every(
         (d, i) => d === currentPathSplit[i],
       )
       // Combine the matches based on user router.options
       const pathTest = activeOptions?.exact
-        ? exactPathTest(s.location.pathname, next.pathname)
+        ? exactPathTest(s.location.pathname, next.pathname, router.basepath)
         : pathIsFuzzyEqual
       const hashTest = activeOptions?.includeHash
         ? s.location.hash === next.hash
@@ -676,7 +678,7 @@ export function useLinkProps<
   }
 
   const doPreload = () => {
-    router.preloadRoute(dest as any).catch((err) => {
+    router.preloadRoute(options as any).catch((err) => {
       console.warn(err)
       console.warn(preloadWarning)
     })

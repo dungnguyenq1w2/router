@@ -26,12 +26,6 @@ export type Expand<T> = T extends object
     : never
   : T
 
-export type UnionToIntersection<T> = (
-  T extends any ? (k: T) => void : never
-) extends (k: infer I) => any
-  ? I
-  : never
-
 export type DeepPartial<T> = T extends object
   ? {
       [P in keyof T]?: DeepPartial<T[P]>
@@ -69,18 +63,38 @@ export type NonNullableUpdater<TPrevious, TResult = TPrevious> =
   | TResult
   | ((prev: TPrevious) => TResult)
 
-// from https://github.com/type-challenges/type-challenges/issues/737
-type LastInUnion<T> =
-  UnionToIntersection<T extends unknown ? (x: T) => 0 : never> extends (
-    x: infer L,
-  ) => 0
-    ? L
-    : never
-export type UnionToTuple<T, TLast = LastInUnion<T>> = [T] extends [never]
-  ? []
-  : [...UnionToTuple<Exclude<T, TLast>>, TLast]
+export type MergeUnionObjects<TUnion> = TUnion extends MergeUnionPrimitive
+  ? never
+  : TUnion
 
-//
+export type MergeUnionObject<TUnion> =
+  MergeUnionObjects<TUnion> extends infer TObj
+    ? {
+        [TKey in TObj extends any ? keyof TObj : never]?: TObj extends any
+          ? TKey extends keyof TObj
+            ? TObj[TKey]
+            : never
+          : never
+      }
+    : never
+
+export type MergeUnionPrimitive =
+  | ReadonlyArray<any>
+  | number
+  | string
+  | bigint
+  | boolean
+  | symbol
+
+export type MergeUnionPrimitives<TUnion> = TUnion extends MergeUnionPrimitive
+  ? TUnion
+  : TUnion extends object
+    ? never
+    : TUnion
+
+export type MergeUnion<TUnion> =
+  | MergeUnionPrimitives<TUnion>
+  | MergeUnionObject<TUnion>
 
 export function last<T>(arr: Array<T>) {
   return arr[arr.length - 1]
@@ -268,15 +282,17 @@ export type StringLiteral<T> = T extends string
     : T
   : never
 
-export type StrictOrFrom<TFrom, TReturnIntersection extends boolean = false> =
-  | {
-      from: StringLiteral<TFrom> | TFrom
-      strict?: true
-    }
-  | {
+export type StrictOrFrom<
+  TFrom,
+  TStrict extends boolean = true,
+> = TStrict extends false
+  ? {
       from?: never
-      strict: false
-      experimental_returnIntersection?: TReturnIntersection
+      strict: TStrict
+    }
+  : {
+      from: StringLiteral<TFrom> | TFrom
+      strict?: TStrict
     }
 
 export const useLayoutEffect =
@@ -291,21 +307,6 @@ export function escapeJSON(jsonString: string) {
     .replace(/\\/g, '\\\\') // Escape backslashes
     .replace(/'/g, "\\'") // Escape single quotes
     .replace(/"/g, '\\"') // Escape double quotes
-}
-
-export function removeTrailingSlash(value: string): string {
-  if (value.endsWith('/') && value !== '/') {
-    return value.slice(0, -1)
-  }
-  return value
-}
-
-// intended to only compare path name
-// see the usage in the isActive under useLinkProps
-// /sample/path1 = /sample/path1/
-// /sample/path1/some <> /sample/path1
-export function exactPathTest(pathName1: string, pathName2: string): boolean {
-  return removeTrailingSlash(pathName1) === removeTrailingSlash(pathName2)
 }
 
 export type ControlledPromise<T> = Promise<T> & {

@@ -1,28 +1,14 @@
-import {
-  CatchBoundary,
-  Link,
-  Outlet,
-  ScrollRestoration,
-  createRootRouteWithContext,
-} from '@tanstack/react-router'
+import { createRootRoute } from '@tanstack/react-router'
+import { Link, Outlet, ScrollRestoration } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
-import {
-  Body,
-  Head,
-  Html,
-  Meta,
-  RouterManagedTag,
-  Scripts,
-} from '@tanstack/start'
+import { Body, Head, Html, Meta, Scripts } from '@tanstack/start'
 import * as React from 'react'
 import { DefaultCatchBoundary } from '~/components/DefaultCatchBoundary'
 import { NotFound } from '~/components/NotFound'
 import appCss from '~/styles/app.css?url'
 import { seo } from '~/utils/seo'
 
-export const Route = createRootRouteWithContext<{
-  assets: RouterManagedTag[]
-}>()({
+export const Route = createRootRoute({
   meta: () => [
     {
       charSet: 'utf-8',
@@ -112,6 +98,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             Layout
           </Link>
           <Link
+            to="/deferred"
+            activeProps={{
+              className: 'font-bold',
+            }}
+          >
+            Deferred
+          </Link>
+          <Link
             // @ts-expect-error
             to="/this-route-does-not-exist"
             activeProps={{
@@ -122,7 +116,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
         <hr />
-        {/* <React.Suspense fallback={null}>{children}</React.Suspense> */}
         {children}
         <ScrollRestoration />
         <TanStackRouterDevtools position="bottom-right" />

@@ -7,7 +7,6 @@ import { defaultParseSearch, defaultStringifySearch } from './searchParams'
 import {
   createControlledPromise,
   deepEqual,
-  escapeJSON,
   functionalUpdate,
   last,
   pick,
@@ -27,6 +26,7 @@ import {
 } from './path'
 import { isRedirect, isResolvedRedirect } from './redirects'
 import { isNotFound } from './not-found'
+import type { Manifest } from './manifest'
 import type * as React from 'react'
 import type {
   HistoryLocation,
@@ -380,6 +380,7 @@ export interface BuildNextOptions {
   }
   from?: string
   fromSearch?: unknown
+  _fromLocation?: ParsedLocation
 }
 
 export interface DehydratedRouterState {
@@ -393,6 +394,7 @@ export type DehydratedRouteMatch = Pick<
 
 export interface DehydratedRouter {
   state: DehydratedRouterState
+  manifest?: Manifest
 }
 
 export type RouterConstructorOptions<
@@ -419,6 +421,12 @@ export const componentTypes = [
 ] as const
 
 export type RouterEvents = {
+  onBeforeNavigate: {
+    type: 'onBeforeNavigate'
+    fromLocation: ParsedLocation
+    toLocation: ParsedLocation
+    pathChanged: boolean
+  }
   onBeforeLoad: {
     type: 'onBeforeLoad'
     fromLocation: ParsedLocation
@@ -481,9 +489,9 @@ export class Router<
   shouldViewTransition?: boolean = undefined
   latestLoadPromise: Promise<void> = Promise.resolve()
   subscribers = new Set<RouterListener<RouterEvent>>()
-  injectedHtml: Array<InjectedHtmlEntry> = []
   dehydratedData?: TDehydrated
   viewTransitionPromise?: ControlledPromise<true>
+  manifest?: Manifest
 
   // Must build in constructor
   __store!: Store<RouterState<TRouteTree>>
@@ -502,7 +510,7 @@ export class Router<
     'stringifySearch' | 'parseSearch' | 'context'
   >
   history!: RouterHistory
-  latestLocation!: ParsedLocation
+  latestLocation!: ParsedLocation<FullSearchSchema<TRouteTree>>
   basepath!: string
   routeTree!: TRouteTree
   routesById!: RoutesById<TRouteTree>
@@ -763,7 +771,7 @@ export class Router<
   }
 
   parseLocation = (
-    previousLocation?: ParsedLocation,
+    previousLocation?: ParsedLocation<FullSearchSchema<TRouteTree>>,
   ): ParsedLocation<FullSearchSchema<TRouteTree>> => {
     const parse = ({
       pathname,
@@ -1093,16 +1101,31 @@ export class Router<
       } = {},
       matches?: Array<MakeRouteMatch<TRouteTree>>,
     ): ParsedLocation => {
-      let fromPath = this.latestLocation.pathname
-      let fromSearch = dest.fromSearch || this.latestLocation.search
+      const latestLocation =
+        dest._fromLocation ?? (this.latestLocation as ParsedLocation)
+      let fromPath = latestLocation.pathname
+      let fromSearch = dest.fromSearch || latestLocation.search
 
-      const fromMatches = this.matchRoutes(
-        this.latestLocation.pathname,
-        fromSearch,
+      const fromMatches = this.matchRoutes(latestLocation.pathname, fromSearch)
+
+      const fromMatch =
+        dest.from != null
+          ? fromMatches.find((d) =>
+              matchPathname(this.basepath, trimPathRight(d.pathname), {
+                to: dest.from,
+                caseSensitive: false,
+                fuzzy: false,
+              }),
+            )
+          : undefined
+
+      fromPath = fromMatch?.pathname || fromPath
+
+      invariant(
+        dest.from == null || fromMatch != null,
+        'Could not find match for from: ' + dest.from,
       )
 
-      fromPath =
-        fromMatches.find((d) => d.id === dest.from)?.pathname || fromPath
       fromSearch = last(fromMatches)?.search || this.latestLocation.search
 
       const stayingMatches = matches?.filter((d) =>
@@ -1253,9 +1276,10 @@ export class Router<
         })
 
         if (foundMask) {
+          const { from, ...maskProps } = foundMask
           maskedDest = {
             ...pick(opts, ['from']),
-            ...foundMask,
+            ...maskProps,
             params,
           }
           maskedNext = build(maskedDest)
@@ -1372,7 +1396,7 @@ export class Router<
     })
   }
 
-  navigate: NavigateFn = ({ from, to, ...rest }) => {
+  navigate: NavigateFn = ({ from, to, __isRedirect, ...rest }) => {
     // If this link simply reloads the current route,
     // make sure it has a new key so it will trigger a data refresh
 
@@ -1421,13 +1445,6 @@ export class Router<
         // Cancel any pending matches
         this.cancelMatches()
 
-        this.emit({
-          type: 'onBeforeLoad',
-          fromLocation: prevLocation,
-          toLocation: next,
-          pathChanged: pathDidChange,
-        })
-
         let pendingMatches!: Array<AnyRouteMatch>
 
         this.__store.batch(() => {
@@ -1450,6 +1467,22 @@ export class Router<
               return !pendingMatches.find((e) => e.id === d.id)
             }),
           }))
+        })
+
+        if (!this.state.redirect) {
+          this.emit({
+            type: 'onBeforeNavigate',
+            fromLocation: prevLocation,
+            toLocation: next,
+            pathChanged: pathDidChange,
+          })
+        }
+
+        this.emit({
+          type: 'onBeforeLoad',
+          fromLocation: prevLocation,
+          toLocation: next,
+          pathChanged: pathDidChange,
         })
 
         await this.loadMatches({
@@ -1514,7 +1547,7 @@ export class Router<
         if (isResolvedRedirect(err)) {
           redirect = err
           if (!this.isServer) {
-            this.navigate({ ...err, replace: true })
+            this.navigate({ ...err, replace: true, __isRedirect: true })
             this.load()
           }
         } else if (isNotFound(err)) {
@@ -1523,8 +1556,9 @@ export class Router<
 
         this.__store.setState((s) => ({
           ...s,
-          statusCode:
-            redirect?.statusCode || notFound
+          statusCode: redirect
+            ? redirect.statusCode
+            : notFound
               ? 404
               : s.matches.some((d) => d.status === 'error')
                 ? 500
@@ -1717,13 +1751,13 @@ export class Router<
                   handleRedirectAndNotFound(match, err)
                 }
 
-                matches[index] = match = {
+                matches[index] = match = updateMatch(match.id, () => ({
                   ...match,
                   error: err,
                   status: 'error',
                   updatedAt: Date.now(),
                   abortController: new AbortController(),
-                }
+                }))
               }
 
               if (match.paramsError) {
@@ -1739,8 +1773,8 @@ export class Router<
                   parentMatch?.context ?? this.options.context ?? {}
 
                 // Make sure the match has parent context set before going further
-                matches[index] = match = updateMatch(match.id, (prev) => ({
-                  ...prev,
+                matches[index] = match = updateMatch(match.id, () => ({
+                  ...match,
                   routeContext: replaceEqualDeep(
                     match.routeContext,
                     parentContext,
@@ -1757,7 +1791,7 @@ export class Router<
                     context: parentContext,
                     location,
                     navigate: (opts: any) =>
-                      this.navigate({ ...opts, from: match.pathname }),
+                      this.navigate({ ...opts, _fromLocation: location }),
                     buildLocation: this.buildLocation,
                     cause: preload ? 'preload' : match.cause,
                   })) ?? ({} as any)
@@ -1811,7 +1845,7 @@ export class Router<
                   context: match.context,
                   location,
                   navigate: (opts) =>
-                    this.navigate({ ...opts, from: match.pathname } as any),
+                    this.navigate({ ...opts, _fromLocation: location }),
                   cause: preload ? 'preload' : match.cause,
                   route,
                 }
@@ -2166,9 +2200,8 @@ export class Router<
     } catch (err) {
       if (isRedirect(err)) {
         return await this.preloadRoute({
-          fromSearch: next.search,
-          from: next.pathname,
           ...(err as any),
+          _fromLocation: next,
         })
       }
       // Preload errors are not fatal, but we should still log them
@@ -2228,10 +2261,6 @@ export class Router<
     return match
   }
 
-  injectHtml = async (html: string | (() => Promise<string> | string)) => {
-    this.injectedHtml.push(html)
-  }
-
   // We use a token -> weak map to keep track of deferred promises
   // that are registered on the server and need to be resolved
   registeredDeferredsIds = new Map<string, {}>()
@@ -2245,55 +2274,6 @@ export class Router<
     }
 
     return this.registeredDeferreds.get(token)
-  }
-
-  /**
-   * @deprecated Please inject your own html using the `injectHtml` method
-   */
-  dehydrateData = <T>(key: any, getData: T | (() => Promise<T> | T)) => {
-    warning(
-      false,
-      `The dehydrateData method is deprecated. Please use the injectHtml method to inject your own data.`,
-    )
-
-    if (typeof document === 'undefined') {
-      const strKey = typeof key === 'string' ? key : JSON.stringify(key)
-
-      this.injectHtml(async () => {
-        const id = `__TSR_DEHYDRATED__${strKey}`
-        const data =
-          typeof getData === 'function' ? await (getData as any)() : getData
-        return `<script id='${id}' suppressHydrationWarning>
-  window["__TSR_DEHYDRATED__${escapeJSON(
-    strKey,
-  )}"] = ${JSON.stringify(this.options.transformer.stringify(data))}
-</script>`
-      })
-
-      return () => this.hydrateData<T>(key)
-    }
-
-    return () => undefined
-  }
-
-  /**
-   * @deprecated Please extract your own data from scripts injected using the `injectHtml` method
-   */
-  hydrateData = <T = unknown>(key: any) => {
-    warning(
-      false,
-      `The hydrateData method is deprecated. Please use the extractHtml method to extract your own data.`,
-    )
-
-    if (typeof document !== 'undefined') {
-      const strKey = typeof key === 'string' ? key : JSON.stringify(key)
-
-      return this.options.transformer.parse(
-        window[`__TSR_DEHYDRATED__${strKey}` as any] as unknown as string,
-      ) as T
-    }
-
-    return undefined
   }
 
   dehydrate = (): DehydratedRouter => {
@@ -2314,6 +2294,7 @@ export class Router<
             : undefined,
         })),
       },
+      manifest: this.manifest,
     }
   }
 
@@ -2376,6 +2357,8 @@ export class Router<
         matches: matches as any,
       }
     })
+
+    this.manifest = ctx.router.manifest
   }
 
   handleNotFound = (matches: Array<AnyRouteMatch>, err: NotFoundError) => {

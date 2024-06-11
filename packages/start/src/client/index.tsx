@@ -14,10 +14,10 @@ export {
 export { DehydrateRouter } from './DehydrateRouter'
 export { json } from './json'
 export { Meta, Html, Head, Body } from './Meta'
-export { type RouterManagedTag } from './RouterManagedTag'
 export { Scripts } from './Scripts'
 export { StartClient } from './StartClient'
 export {
   serverFnPayloadTypeHeader,
   serverFnReturnTypeHeader,
 } from '../constants'
+export { mergeHeaders } from './headers'

@@ -1,6 +1,6 @@
 import type { AnyRoute } from './route'
-import type { AnyRouter, Router, TrailingSlashOption } from './router'
-import type { UnionToIntersection, UnionToTuple } from './utils'
+import type { AnyRouter, TrailingSlashOption } from './router'
+import type { Expand, MergeUnion } from './utils'
 
 export type ParseRoute<TRouteTree, TAcc = TRouteTree> = TRouteTree extends {
   types: { children: infer TChildren }
@@ -114,26 +114,22 @@ export type RouteByToPath<TRouter extends AnyRouter, TTo> = Extract<
   AnyRoute
 >
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
-type UnionizeCollisions<T, U> = {
-  [P in keyof T & keyof U]: T[P] extends U[P] ? T[P] : T[P] | U[P]
-}
-// eslint-disable-next-line @typescript-eslint/naming-convention
-type Reducer<T, U, C = UnionizeCollisions<T, U>> = C &
-  Omit<T, keyof C> &
-  Omit<U, keyof C>
-
-type Reduce<TValue extends Array<any>, TResult = unknown> = TValue extends [
-  infer First,
-  ...infer Rest,
-]
-  ? Reduce<Rest, Reducer<TResult, First>>
-  : TResult
-
-export type FullSearchSchema<TRouteTree extends AnyRoute> = Partial<
-  Reduce<UnionToTuple<ParseRoute<TRouteTree>['types']['fullSearchSchema']>>
+export type FullSearchSchema<TRouteTree extends AnyRoute> = MergeUnion<
+  ParseRoute<TRouteTree>['types']['fullSearchSchema']
 >
 
-export type AllParams<TRouteTree extends AnyRoute> = UnionToIntersection<
+export type FullSearchSchemaInput<TRouteTree extends AnyRoute> = MergeUnion<
+  ParseRoute<TRouteTree>['types']['fullSearchSchemaInput']
+>
+
+export type AllParams<TRouteTree extends AnyRoute> = MergeUnion<
   ParseRoute<TRouteTree>['types']['allParams']
+>
+
+export type AllContext<TRouteTree extends AnyRoute> = MergeUnion<
+  ParseRoute<TRouteTree>['types']['allContext']
+>
+
+export type AllLoaderData<TRouteTree extends AnyRoute> = MergeUnion<
+  ParseRoute<TRouteTree>['types']['loaderData']
 >

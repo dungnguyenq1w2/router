@@ -12,7 +12,7 @@ export {
 } from '@tanstack/history'
 export { default as invariant } from 'tiny-invariant'
 export { default as warning } from 'tiny-warning'
-export { useAwaited, Await, type AwaitOptions } from './awaited'
+export { useAwaited, Await, type AwaitOptions, ScriptOnce } from './awaited'
 export {
   defer,
   isDehydratedDeferred,
@@ -154,10 +154,8 @@ export {
   type ResolveFullSearchSchema,
   type ResolveFullSearchSchemaInput,
   type AnyRoute,
-  type ResolveAllParams,
   type RouteConstraints,
   type AnyRootRoute,
-  type RootSearchSchema,
   type ResolveFullPath,
   type RouteMask,
   type ErrorRouteProps,
@@ -269,3 +267,4 @@ export {
   DefaultGlobalNotFound,
   type NotFoundError,
 } from './not-found'
+export { type Manifest, type RouterManagedTag } from './manifest'

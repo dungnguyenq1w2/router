@@ -16,14 +16,7 @@ import type { NavigateOptions, ParsePathParams, ToSubOptions } from './link'
 import type { ParsedLocation } from './location'
 import type { RouteById, RouteIds, RoutePaths } from './routeInfo'
 import type { AnyRouter, RegisteredRouter, Router } from './router'
-import type {
-  Assign,
-  Expand,
-  IsAny,
-  NoInfer,
-  PickRequired,
-  UnionToIntersection,
-} from './utils'
+import type { Assign, Expand, IsAny, NoInfer, PickRequired } from './utils'
 import type { BuildLocationFn, NavigateFn } from './RouterProvider'
 import type { NotFoundError } from './not-found'
 import type { LazyRoute } from './fileRoute'
@@ -52,17 +45,17 @@ export type RoutePathOptions<TCustomId, TPath> =
 
 export interface StaticDataRouteOption {}
 
-export type RoutePathOptionsIntersection<TCustomId, TPath> =
-  UnionToIntersection<RoutePathOptions<TCustomId, TPath>>
+export type RoutePathOptionsIntersection<TCustomId, TPath> = {
+  path: TPath
+  id: TCustomId
+}
 
 export type RouteOptions<
   TParentRoute extends AnyRoute = AnyRoute,
   TCustomId extends string = string,
   TPath extends string = string,
-  TSearchSchemaInput = {},
+  TSearchSchemaInput = Record<string, unknown>,
   TSearchSchema = {},
-  TSearchSchemaUsed = {},
-  TFullSearchSchemaInput = TSearchSchemaUsed,
   TFullSearchSchema = TSearchSchema,
   TParams = AnyPathParams,
   TAllParams = TParams,
@@ -71,18 +64,14 @@ export type RouteOptions<
   TRouterContext = AnyContext,
   TAllContext = AnyContext,
   TLoaderDeps extends Record<string, any> = {},
-  TLoaderDataReturn = unknown,
-  TLoaderData = [TLoaderDataReturn] extends [never]
-    ? undefined
-    : TLoaderDataReturn,
+  TLoaderDataReturn = {},
+  TLoaderData = ResolveLoaderData<TLoaderDataReturn>,
 > = BaseRouteOptions<
   TParentRoute,
   TCustomId,
   TPath,
   TSearchSchemaInput,
   TSearchSchema,
-  TSearchSchemaUsed,
-  TFullSearchSchemaInput,
   TFullSearchSchema,
   TParams,
   TAllParams,
@@ -111,7 +100,7 @@ export type ParamsFallback<
 export type FileBaseRouteOptions<
   TParentRoute extends AnyRoute = AnyRoute,
   TPath extends string = string,
-  TSearchSchemaInput = {},
+  TSearchSchemaInput = Record<string, unknown>,
   TSearchSchema = {},
   TFullSearchSchema = TSearchSchema,
   TParams = {},
@@ -121,7 +110,7 @@ export type FileBaseRouteOptions<
   TRouterContext = AnyContext,
   TAllContext = AnyContext,
   TLoaderDeps extends Record<string, any> = {},
-  TLoaderDataReturn = unknown,
+  TLoaderDataReturn = {},
 > = {
   validateSearch?: SearchSchemaValidator<TSearchSchemaInput, TSearchSchema>
   shouldReload?:
@@ -175,10 +164,8 @@ export type BaseRouteOptions<
   TParentRoute extends AnyRoute = AnyRoute,
   TCustomId extends string = string,
   TPath extends string = string,
-  TSearchSchemaInput = {},
+  TSearchSchemaInput = Record<string, unknown>,
   TSearchSchema = {},
-  TSearchSchemaUsed = {},
-  TFullSearchSchemaInput = TSearchSchemaUsed,
   TFullSearchSchema = TSearchSchema,
   TParams = {},
   TAllParams = ParamsFallback<TPath, TParams>,
@@ -187,7 +174,7 @@ export type BaseRouteOptions<
   TRouterContext = AnyContext,
   TAllContext = AnyContext,
   TLoaderDeps extends Record<string, any> = {},
-  TLoaderDataReturn = unknown,
+  TLoaderDataReturn = {},
 > = RoutePathOptions<TCustomId, TPath> &
   FileBaseRouteOptions<
     TParentRoute,
@@ -344,7 +331,7 @@ export type RouteLoaderFn<
   in out TLoaderDeps extends Record<string, any> = {},
   in out TAllContext = AnyContext,
   in out TRouteContext = AnyContext,
-  TLoaderData = unknown,
+  TLoaderData = undefined,
 > = (
   match: LoaderFnContext<TAllParams, TLoaderDeps, TAllContext, TRouteContext>,
 ) => Promise<TLoaderData> | TLoaderData
@@ -405,28 +392,15 @@ export type ResolveFullSearchSchema<
   TParentRoute extends AnyRoute,
   TSearchSchema,
 > = unknown extends TParentRoute
-  ? Omit<TSearchSchema, keyof RootSearchSchema>
-  : Assign<
-      TParentRoute['id'] extends RootRouteId
-        ? Omit<TParentRoute['types']['searchSchema'], keyof RootSearchSchema>
-        : TParentRoute['types']['fullSearchSchema'],
-      TSearchSchema
-    >
+  ? TSearchSchema
+  : Assign<TParentRoute['types']['fullSearchSchema'], TSearchSchema>
 
 export type ResolveFullSearchSchemaInput<
   TParentRoute extends AnyRoute,
   TSearchSchemaUsed,
 > = unknown extends TParentRoute
-  ? Omit<TSearchSchemaUsed, keyof RootSearchSchema>
-  : Assign<
-      TParentRoute['id'] extends RootRouteId
-        ? Omit<
-            TParentRoute['types']['searchSchemaInput'],
-            keyof RootSearchSchema
-          >
-        : TParentRoute['types']['fullSearchSchemaInput'],
-      TSearchSchemaUsed
-    >
+  ? TSearchSchemaUsed
+  : Assign<TParentRoute['types']['fullSearchSchemaInput'], TSearchSchemaUsed>
 
 export type ResolveRouteContext<TRouteContextReturn> = [
   TRouteContextReturn,
@@ -475,11 +449,6 @@ export type ResolveAllParamsFromParent<
 > = unknown extends TParentRoute
   ? TParams
   : Assign<TParentRoute['types']['allParams'], TParams>
-
-export type ResolveAllParams<TParentRoute extends AnyRoute, TParams> =
-  Record<never, string> extends TParentRoute['types']['allParams']
-    ? TParams
-    : UnionToIntersection<TParentRoute['types']['allParams'] & TParams> & {}
 
 export type RouteConstraints = {
   TParentRoute: AnyRoute
@@ -605,7 +574,7 @@ export class Route<
     TCustomId,
     TPath
   >,
-  in out TSearchSchemaInput = {},
+  in out TSearchSchemaInput = Record<string, unknown>,
   in out TSearchSchema = {},
   in out TSearchSchemaUsed = ResolveSearchSchemaUsed<
     TSearchSchemaInput,
@@ -620,7 +589,7 @@ export class Route<
     TSearchSchema
   >,
   in out TParams = Record<ParsePathParams<TPath>, string>,
-  in out TAllParams = ResolveAllParams<TParentRoute, TParams>,
+  in out TAllParams = ResolveAllParamsFromParent<TParentRoute, TParams>,
   TRouteContextReturn = RouteContext,
   in out TRouteContext = ResolveRouteContext<TRouteContextReturn>,
   in out TAllContext = Assign<
@@ -629,7 +598,7 @@ export class Route<
   >,
   in out TRouterContext = AnyContext,
   in out TLoaderDeps extends Record<string, any> = {},
-  TLoaderDataReturn = unknown,
+  TLoaderDataReturn = {},
   in out TLoaderData = ResolveLoaderData<TLoaderDataReturn>,
   in out TChildren = unknown,
 > {
@@ -640,8 +609,6 @@ export class Route<
     TPath,
     TSearchSchemaInput,
     TSearchSchema,
-    TSearchSchemaUsed,
-    TFullSearchSchemaInput,
     TFullSearchSchema,
     TParams,
     TAllParams,
@@ -679,8 +646,6 @@ export class Route<
       TPath,
       TSearchSchemaInput,
       TSearchSchema,
-      TSearchSchemaUsed,
-      TFullSearchSchemaInput,
       TFullSearchSchema,
       TParams,
       TAllParams,
@@ -735,8 +700,6 @@ export class Route<
           TPath,
           TSearchSchemaInput,
           TSearchSchema,
-          TSearchSchemaUsed,
-          TFullSearchSchemaInput,
           TFullSearchSchema,
           TParams,
           TAllParams,
@@ -950,7 +913,7 @@ export function createRoute<
     TCustomId,
     TPath
   >,
-  TSearchSchemaInput = {},
+  TSearchSchemaInput = Record<string, unknown>,
   TSearchSchema = {},
   TSearchSchemaUsed = ResolveSearchSchemaUsed<
     TSearchSchemaInput,
@@ -962,7 +925,7 @@ export function createRoute<
   >,
   TFullSearchSchema = ResolveFullSearchSchema<TParentRoute, TSearchSchema>,
   TParams = Record<ParsePathParams<TPath>, string>,
-  TAllParams = ResolveAllParams<TParentRoute, TParams>,
+  TAllParams = ResolveAllParamsFromParent<TParentRoute, TParams>,
   TRouteContextReturn = RouteContext,
   TRouteContext = ResolveRouteContext<TRouteContextReturn>,
   TAllContext = Assign<
@@ -971,7 +934,7 @@ export function createRoute<
   >,
   TRouterContext = AnyContext,
   TLoaderDeps extends Record<string, any> = {},
-  TLoaderDataReturn = unknown,
+  TLoaderDataReturn = {},
   TLoaderData = ResolveLoaderData<TLoaderDataReturn>,
   TChildren = unknown,
 >(
@@ -981,8 +944,6 @@ export function createRoute<
     TPath,
     TSearchSchemaInput,
     TSearchSchema,
-    TSearchSchemaUsed,
-    TFullSearchSchemaInput,
     TFullSearchSchema,
     TParams,
     TAllParams,
@@ -1022,14 +983,13 @@ export function createRoute<
 export type AnyRootRoute = RootRoute<any, any, any, any, any, any, any, any>
 
 export type RootRouteOptions<
-  TSearchSchemaInput = RootSearchSchema,
-  TSearchSchema = RootSearchSchema,
-  TSearchSchemaUsed = RootSearchSchema,
+  TSearchSchemaInput = {},
+  TSearchSchema = {},
   TRouteContextReturn = RouteContext,
   TRouteContext = ResolveRouteContext<TRouteContextReturn>,
   TRouterContext = {},
   TLoaderDeps extends Record<string, any> = {},
-  TLoaderDataReturn = unknown,
+  TLoaderDataReturn = {},
   TLoaderData = ResolveLoaderData<TLoaderDataReturn>,
 > = Omit<
   RouteOptions<
@@ -1038,8 +998,6 @@ export type RootRouteOptions<
     '', // TPath
     TSearchSchemaInput, // TSearchSchemaInput
     TSearchSchema, // TSearchSchema
-    TSearchSchemaUsed,
-    TSearchSchemaUsed, //TFullSearchSchemaInput
     TSearchSchema, // TFullSearchSchema
     {}, // TParams
     {}, // TAllParams
@@ -1061,23 +1019,22 @@ export type RootRouteOptions<
 
 export function createRootRouteWithContext<TRouterContext extends {}>() {
   return <
-    TSearchSchemaInput extends Record<string, any> = RootSearchSchema,
-    TSearchSchema extends Record<string, any> = RootSearchSchema,
-    TSearchSchemaUsed extends Record<string, any> = RootSearchSchema,
+    TSearchSchemaInput = {},
+    TSearchSchema = {},
+    TSearchSchemaUsed = ResolveSearchSchemaUsed<
+      TSearchSchemaInput,
+      TSearchSchema
+    >,
     TRouteContextReturn extends RouteContext = RouteContext,
-    TRouteContext extends RouteContext = [TRouteContextReturn] extends [never]
-      ? RouteContext
-      : TRouteContextReturn,
+    TRouteContext extends
+      RouteContext = ResolveRouteContext<TRouteContextReturn>,
     TLoaderDeps extends Record<string, any> = {},
-    TLoaderDataReturn = unknown,
-    TLoaderData = [TLoaderDataReturn] extends [never]
-      ? undefined
-      : TLoaderDataReturn,
+    TLoaderDataReturn = {},
+    TLoaderData = ResolveLoaderData<TLoaderDataReturn>,
   >(
     options?: RootRouteOptions<
       TSearchSchemaInput,
       TSearchSchema,
-      TSearchSchemaUsed,
       TRouteContextReturn,
       TRouteContext,
       TRouterContext,
@@ -1104,19 +1061,15 @@ export function createRootRouteWithContext<TRouterContext extends {}>() {
  */
 export const rootRouteWithContext = createRootRouteWithContext
 
-export type RootSearchSchema = {
-  __TRootSearchSchema__: '__TRootSearchSchema__'
-}
-
 export class RootRoute<
-  in out TSearchSchemaInput = RootSearchSchema,
-  in out TSearchSchema = RootSearchSchema,
-  in out TSearchSchemaUsed = RootSearchSchema,
+  in out TSearchSchemaInput = {},
+  in out TSearchSchema = {},
+  in out TSearchSchemaUsed = {},
   TRouteContextReturn = RouteContext,
   in out TRouteContext = ResolveRouteContext<TRouteContextReturn>,
   in out TRouterContext = {},
   TLoaderDeps extends Record<string, any> = {},
-  TLoaderDataReturn = unknown,
+  TLoaderDataReturn = {},
   in out TLoaderData = ResolveLoaderData<TLoaderDataReturn>,
 > extends Route<
   any, // TParentRoute
@@ -1147,7 +1100,6 @@ export class RootRoute<
     options?: RootRouteOptions<
       TSearchSchemaInput,
       TSearchSchema,
-      TSearchSchemaUsed,
       TRouteContextReturn,
       TRouteContext,
       TRouterContext,
@@ -1161,14 +1113,17 @@ export class RootRoute<
 }
 
 export function createRootRoute<
-  TSearchSchemaInput = RootSearchSchema,
-  TSearchSchema = RootSearchSchema,
-  TSearchSchemaUsed = RootSearchSchema,
+  TSearchSchemaInput = {},
+  TSearchSchema = {},
+  TSearchSchemaUsed = ResolveSearchSchemaUsed<
+    TSearchSchemaInput,
+    TSearchSchema
+  >,
   TRouteContextReturn = RouteContext,
   TRouteContext = ResolveRouteContext<TRouteContextReturn>,
   TRouterContext = {},
   TLoaderDeps extends Record<string, any> = {},
-  TLoaderDataReturn = unknown,
+  TLoaderDataReturn = {},
   TLoaderData = ResolveLoaderData<TLoaderDataReturn>,
 >(
   options?: Omit<
@@ -1178,9 +1133,7 @@ export function createRootRoute<
       '', // TPath
       TSearchSchemaInput, // TSearchSchemaInput
       TSearchSchema, // TSearchSchema
-      TSearchSchemaUsed,
-      TSearchSchemaUsed, // TFullSearchSchemaInput
-      TSearchSchema, // TFullSearchSchema
+      TSearchSchema,
       {}, // TParams
       {}, // TAllParams
       TRouteContextReturn, // TRouteContextReturn
@@ -1310,7 +1263,7 @@ export type NotFoundRouteComponent = SyncRouteComponent<NotFoundRouteProps>
 
 export class NotFoundRoute<
   TParentRoute extends AnyRootRoute,
-  TSearchSchemaInput extends Record<string, any> = {},
+  TSearchSchemaInput = Record<string, unknown>,
   TSearchSchema = {},
   TSearchSchemaUsed = {},
   TFullSearchSchemaInput = ResolveFullSearchSchemaInput<
@@ -1320,13 +1273,10 @@ export class NotFoundRoute<
   TFullSearchSchema = ResolveFullSearchSchema<TParentRoute, TSearchSchema>,
   TRouteContextReturn = AnyContext,
   TRouteContext = RouteContext,
-  TAllContext = Assign<
-    IsAny<TParentRoute['types']['allContext'], {}>,
-    TRouteContext
-  >,
+  TAllContext = ResolveAllContext<TParentRoute, TRouteContext>,
   TRouterContext = AnyContext,
   TLoaderDeps extends Record<string, any> = {},
-  TLoaderDataReturn = unknown,
+  TLoaderDataReturn = {},
   TLoaderData = ResolveLoaderData<TLoaderDataReturn>,
   TChildren = unknown,
 > extends Route<
@@ -1359,8 +1309,6 @@ export class NotFoundRoute<
         string,
         TSearchSchemaInput,
         TSearchSchema,
-        TSearchSchemaUsed,
-        TFullSearchSchemaInput,
         TFullSearchSchema,
         {},
         {},
