@@ -1101,12 +1101,22 @@ export class Router<
       } = {},
       matches?: Array<MakeRouteMatch<TRouteTree>>,
     ): ParsedLocation => {
-      const latestLocation =
-        dest._fromLocation ?? (this.latestLocation as ParsedLocation)
-      let fromPath = latestLocation.pathname
-      let fromSearch = dest.fromSearch || latestLocation.search
+      // if the router is loading the previous location is what
+      // we should use because the old matches are still around
+      // and the latest location has already been updated.
+      // If the router is not loading we should always use the
+      // latest location because resolvedLocation can lag behind
+      // and the new matches could already render
+      const currentLocation = this.state.isLoading
+        ? this.state.resolvedLocation
+        : this.latestLocation
 
-      const fromMatches = this.matchRoutes(latestLocation.pathname, fromSearch)
+      const location = dest._fromLocation ?? currentLocation
+
+      let fromPath = location.pathname
+      let fromSearch = dest.fromSearch || location.search
+
+      const fromMatches = this.matchRoutes(location.pathname, fromSearch)
 
       const fromMatch =
         dest.from != null
@@ -1548,7 +1558,7 @@ export class Router<
           redirect = err
           if (!this.isServer) {
             this.navigate({ ...err, replace: true, __isRedirect: true })
-            this.load()
+            // this.load()
           }
         } else if (isNotFound(err)) {
           notFound = err
@@ -1773,28 +1783,32 @@ export class Router<
                   parentMatch?.context ?? this.options.context ?? {}
 
                 // Make sure the match has parent context set before going further
-                matches[index] = match = updateMatch(match.id, () => ({
+                matches[index] = match = {
                   ...match,
                   routeContext: replaceEqualDeep(
                     match.routeContext,
                     parentContext,
                   ),
+                  context: replaceEqualDeep(match.context, parentContext),
                   abortController,
-                }))
+                }
 
-                const beforeLoadContext =
-                  (await route.options.beforeLoad?.({
-                    search: match.search,
-                    abortController,
-                    params: match.params,
-                    preload: !!preload,
-                    context: parentContext,
-                    location,
-                    navigate: (opts: any) =>
-                      this.navigate({ ...opts, _fromLocation: location }),
-                    buildLocation: this.buildLocation,
-                    cause: preload ? 'preload' : match.cause,
-                  })) ?? ({} as any)
+                const beforeLoadFnContext = {
+                  search: match.search,
+                  abortController,
+                  params: match.params,
+                  preload: !!preload,
+                  context: match.routeContext,
+                  location,
+                  navigate: (opts: any) =>
+                    this.navigate({ ...opts, _fromLocation: location }),
+                  buildLocation: this.buildLocation,
+                  cause: preload ? 'preload' : match.cause,
+                }
+
+                const beforeLoadContext = route.options.beforeLoad
+                  ? (await route.options.beforeLoad(beforeLoadFnContext)) ?? {}
+                  : {}
 
                 checkLatest()
 
@@ -1850,7 +1864,7 @@ export class Router<
                   route,
                 }
 
-                const fetch = async () => {
+                const fetchAndResolveInLoaderLifetime = async () => {
                   const existing = getRouteMatch(this.state, match.id)!
                   let lazyPromise = Promise.resolve()
                   let componentsPromise = Promise.resolve() as Promise<any>
@@ -2025,7 +2039,7 @@ export class Router<
 
                 const fetchWithRedirectAndNotFound = async () => {
                   try {
-                    await fetch()
+                    await fetchAndResolveInLoaderLifetime()
                   } catch (err) {
                     checkLatest()
                     handleRedirectAndNotFound(match, err)
